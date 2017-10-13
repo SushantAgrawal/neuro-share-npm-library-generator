@@ -1,8 +1,9 @@
-import { Component, OnInit, Input, ViewEncapsulation } from '@angular/core';
+import { Component, OnInit, Input, ViewEncapsulation,ViewChild, TemplateRef } from '@angular/core';
 import * as d3 from 'd3';
 import { GRAPH_SETTINGS } from '../../neuro-graph.config';
 import { BrokerService } from '../../broker/broker.service';
 import { allMessages, allHttpMessages } from '../../neuro-graph.config';
+import { MdDialog, MdDialogRef, MD_DIALOG_DATA } from '@angular/material';
 
 @Component({
   selector: '[app-labs]',
@@ -11,6 +12,7 @@ import { allMessages, allHttpMessages } from '../../neuro-graph.config';
   encapsulation: ViewEncapsulation.None
 })
 export class LabsComponent implements OnInit {
+  @ViewChild('labSecondLevelTemplate') private labSecondLevelTemplate: TemplateRef<any>;  
   @Input() private chartState: any;
   private chart: any;
   private width: number;
@@ -23,20 +25,19 @@ export class LabsComponent implements OnInit {
   private lineA: any;
   private pathUpdate: any;
   private labsData: Array<any> ;
-
+  private labsDataDetails: Array<any> ;
 private subscriptions: any;
 private datasetA: Array<any> ;
 private datasetB: Array<any> =[];
 private datasetC: Array<any> =[];
- 
-  constructor(private brokerService: BrokerService) { }
+private dialogRef: any;
+  constructor(private brokerService: BrokerService,public dialog: MdDialog) { }
 
   ngOnInit() {
     this.subscriptions = this
     .brokerService
     .filterOn(allHttpMessages.httpGetLabs)
     .subscribe(d => {
-    // debugger;
       d.error
         ? console.log(d.error)
         : (() => {
@@ -58,12 +59,10 @@ private datasetC: Array<any> =[];
         d.error
           ? console.log(d.error)
           : (() => {
-            console.log(d.data);
             //make api call
              this
             .brokerService
             .httpGet(allHttpMessages.httpGetLabs);
-           // this.createChart();
           })();
       });
 
@@ -73,7 +72,6 @@ private datasetC: Array<any> =[];
         d.error
           ? console.log(d.error)
           : (() => {
-            console.log(d.data);
             this.removeChart();
           })();
       })
@@ -87,6 +85,12 @@ private datasetC: Array<any> =[];
     this
       .subscriptions
       .unsubscribe();
+  }
+  showSecondLevel(data) {
+    //debugger;
+    this.labsDataDetails = data.orderDetails;
+    let dialogConfig = { hasBackdrop: false, skipHide: true, panelClass: 'ns-labs-theme', width: '700px', height: '450px' };
+    this.dialogRef = this.dialog.open(this.labSecondLevelTemplate, dialogConfig);
   }
   removeChart() {
     d3.select('#labs').selectAll("*").remove();
@@ -231,6 +235,7 @@ private datasetC: Array<any> =[];
         return returnColor;
       })
       .on('click', d => {
+        //this.showSecondLevel(d);
       })
 
     this.chart.append("text")

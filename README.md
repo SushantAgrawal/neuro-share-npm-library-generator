@@ -5,7 +5,7 @@
 To install this library, run:
 
 ```bash
-$ npm install sutterhealth-neuro-graph --save
+$ npm install @sutterhealth/neuro-graph --save
 ```
 
 ## Consuming your library
@@ -13,7 +13,7 @@ $ npm install sutterhealth-neuro-graph --save
 Once you have published your library to npm, you can import your library in any Angular application by running:
 
 ```bash
-$ npm install sutterhealth-neuro-graph
+$ npm install @sutterhealth/neuro-graph
 ```
 
 and then from your Angular `AppModule`:
@@ -25,7 +25,7 @@ import { NgModule } from '@angular/core';
 import { AppComponent } from './app.component';
 
 // Import your library
-import { SampleModule } from 'sutterhealth-neuro-graph';
+import { NeuroGraphModule } from '@sutterhealth/neuro-graph';
 
 @NgModule({
   declarations: [
@@ -34,7 +34,7 @@ import { SampleModule } from 'sutterhealth-neuro-graph';
   imports: [
     BrowserModule,
 
-    // Specify your library as an import
+    NeuroGraphModule,
     LibraryModule
   ],
   providers: [],
