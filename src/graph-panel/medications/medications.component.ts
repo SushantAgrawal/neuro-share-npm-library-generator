@@ -1,12 +1,10 @@
 import { Component, OnInit, Input, TemplateRef, ViewChild, ViewEncapsulation } from '@angular/core';
+import { MdDialog, MdDialogRef } from '@angular/material';
 import * as d3 from 'd3';
 import { BrokerService } from '../../broker/broker.service';
-import { allMessages, allHttpMessages, manyHttpMessages, medication } from '../../neuro-graph.config';
+import { allMessages, allHttpMessages, manyHttpMessages, medication, GRAPH_SETTINGS } from '../../neuro-graph.config';
 import { searchObject } from '../../neuro-graph.helper';
-import { GRAPH_SETTINGS } from '../../neuro-graph.config';
-import { MdDialog, MdDialogRef } from '@angular/material';
 import { NeuroGraphService } from '../../neuro-graph.service';
-
 
 @Component({
   selector: '[app-medications]',
@@ -20,55 +18,65 @@ export class MedicationsComponent implements OnInit {
   @ViewChild('otherMedsSecondLevelTemplate') private otherMedsSecondLevelTemplate: TemplateRef<any>;
   @Input() private chartState: any;
 
-  graphDimension = GRAPH_SETTINGS.panel;
-  dialogRef: MdDialogRef<any>;
-  medSecondLayerModel: any;
-  subscriptions: any;
-  dmtArray: Array<any> = [];
-  vitaminDArray: Array<any> = [];
-  otherMedsArray: Array<any> = [];
-  selectedMed: Object = {
+  private graphDimension = GRAPH_SETTINGS.panel;
+  private dialogRef: MdDialogRef<any>;
+  private medSecondLayerModel: any;
+  private subscriptions: any;
+  private dmtArray: Array<any> = [];
+  private vitaminDArray: Array<any> = [];
+  private otherMedsArray: Array<any> = [];
+  private selectedMed = {
     dmt: false,
     otherMeds: false,
     vitaminD: false
   };
-  medType = {
+  private medType = {
     dmt: 'dmt',
     otherMeds: 'otherMeds',
     vitaminD: 'vitaminD'
   };
-  dmtSecondLayerLocalData: Array<any>;
-  otherMedsSecondLayerLocalData: Array<any>;
-  relapsesLocalData: Array<any>;
-  months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-
+  private dmtSecondLayerLocalData: Array<any>;
+  private otherMedsSecondLayerLocalData: Array<any>;
+  private relapsesLocalData: Array<any>;
+  private months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   constructor(private brokerService: BrokerService, private dialog: MdDialog, private neuroGraphService: NeuroGraphService) { }
 
   ngOnInit() {
-    this.subscriptions = this
-      .brokerService
-      .filterOn(allHttpMessages.httpGetMedications)
-      .subscribe(d => {
-        d.error ? console.log(d.error) : (() => {
-          this.prepareMedications(d.data);
-          if (this.selectedMed[this.medType.dmt]) {
-            this.drawDmt();
-          }
-          if (this.selectedMed[this.medType.vitaminD]) {
-            this.drawVitaminD();
-          } if (this.selectedMed[this.medType.otherMeds]) {
-            this.drawOtherMeds();
-          }
-        })();
-      });
-    let neuroRelated = this
-      .brokerService
-      .filterOn(allMessages.neuroRelated);
+    this.subscriptions = this.brokerService.filterOn(allHttpMessages.httpGetMedications).subscribe(d => {
+      d.error ? console.log(d.error) : (() => {
+        this.prepareMedications(d.data);
+        if (this.selectedMed[this.medType.dmt]) {
+          this.drawDmt();
+        }
+        if (this.selectedMed[this.medType.vitaminD]) {
+          this.drawVitaminD();
+        } if (this.selectedMed[this.medType.otherMeds]) {
+          this.drawOtherMeds();
+        }
+      })();
+    });
+    let neuroRelated = this.brokerService.filterOn(allMessages.neuroRelated);
     this.processMedication(neuroRelated, this.medType.dmt);
     this.processMedication(neuroRelated, this.medType.vitaminD);
     this.processMedication(neuroRelated, this.medType.otherMeds);
+    let subZoom = this.brokerService.filterOn(allMessages.zoomOptionChange).subscribe(d => {
+      d.error ? console.log(d.error) : (() => {
+        if (this.selectedMed.dmt) {
+          this.removeDmt();
+          this.drawDmt();
+        }
+        if (this.selectedMed.otherMeds) {
+          this.removeOtherMeds();
+          this.drawOtherMeds();
+        }
+        if (this.selectedMed.vitaminD) {
+          this.removeVitaminD();
+          this.drawVitaminD();
+        }
+      })();
+    })
+    this.subscriptions.add(subZoom);
 
     //This 'setSecondLayerData' is temporary and used to set a local data source.  Will be removed once apis are ready.
     this.setSecondLayerData();
@@ -76,9 +84,7 @@ export class MedicationsComponent implements OnInit {
   }
 
   ngOnDestroy() {
-    this
-      .subscriptions
-      .unsubscribe();
+    this.subscriptions.unsubscribe();
   }
 
   processMedication(neuroRelated, medication) {
@@ -90,11 +96,10 @@ export class MedicationsComponent implements OnInit {
         ? console.log(d.error)
         : (() => {
           this.selectedMed[medication] = true;
-          this
-            .brokerService
-            .httpGet(allHttpMessages.httpGetMedications);
+          this.brokerService.httpGet(allHttpMessages.httpGetMedications);
         })();
     })
+
     //A medication was unchecked
     let sub2 = neuroRelated.filter(t => {
       return ((t.data.artifact == medication) && (!t.data.checked));
@@ -112,9 +117,7 @@ export class MedicationsComponent implements OnInit {
           }
         })();
     });
-    this.subscriptions
-      .add(sub1)
-      .add(sub2);
+    this.subscriptions.add(sub1).add(sub2);
   }
 
   prepareMedications(data) {

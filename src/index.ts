@@ -8,7 +8,6 @@ import { MdButtonModule,MdMenuModule, MdCheckboxModule, MdSelectModule, MdInputM
 //Custom Components, Services etc
 import { GraphPanelComponent } from './graph-panel/graph-panel.component';
 import { NeuroRelatedComponent } from './neuro-related/neuro-related.component';
-import { NeuroGraphBoxComponent } from './neuro-graph-box/neuro-graph-box.component';
 import { BrokerModule } from "./broker/broker.module";
 import { NeuroGraphService } from './neuro-graph.service';
 import { MedicationsComponent } from './graph-panel/medications/medications.component';
@@ -20,10 +19,10 @@ import { InfoPopupComponent } from './cds/info-popup/info-popup.component';
 import { ImagingComponent } from './graph-panel/imaging/imaging.component';
 import { LabsComponent } from './graph-panel/labs/labs.component';
 import { EvalModule} from '@sutterhealth/analytics';
+import { TwentyFiveFootWalkComponent } from './graph-panel/twenty-five-foot-walk/twenty-five-foot-walk.component';
 
 export * from './graph-panel/graph-panel.component';
 export * from './cds/cds.component';
-export * from './neuro-graph-box/neuro-graph-box.component';
 export * from './neuro-related/neuro-related.component';
 
 export const ROUTES: Routes = [];
@@ -46,7 +45,6 @@ export const ROUTES: Routes = [];
   declarations: [
     GraphPanelComponent,
     NeuroRelatedComponent,
-    NeuroGraphBoxComponent,
     MedicationsComponent,
     CdsComponent,
     EdssComponent,
@@ -54,10 +52,10 @@ export const ROUTES: Routes = [];
     RelapsesComponent,
     InfoPopupComponent,
     ImagingComponent,
-    LabsComponent
+    LabsComponent,
+    TwentyFiveFootWalkComponent
   ],
   exports: [
-    NeuroGraphBoxComponent,
     CdsComponent,
     GraphPanelComponent,
     NeuroRelatedComponent

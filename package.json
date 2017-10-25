@@ -73,6 +73,7 @@
     "node": ">=6.0.0"
   },
   "dependencies": {
-    "@sutterhealth/analytics": "^1.1.10"
+    "@sutterhealth/analytics": "^1.1.10",
+    "moment": "^2.19.1"
   }
 }
