@@ -6,6 +6,7 @@
     "baseUrl": ".",
     "stripInternal": true,
     "emitDecoratorMetadata": true,
+    "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "moduleResolution": "node",
     "outDir": "../build",
