@@ -48,7 +48,9 @@ export class RelapsesComponent implements OnInit {
       .filterOn(allHttpMessages.httpGetRelapse)
       .subscribe(d => {
         d.error
-          ? console.log(d.error)
+          ? (() => {
+            console.log(d.error)
+          })
           : (() => {
             this.relapsesData = d.data.relapses;
             this.createChart();
@@ -89,12 +91,27 @@ export class RelapsesComponent implements OnInit {
       .filter(t => t.data.checked)
       .subscribe(d => {
         d.error
-          ? console.log(d.error)
+          ? (() => {
+            console.log(d.error)
+          })
           : (() => {
             //make api call
             this
               .brokerService
-              .httpGet(allHttpMessages.httpGetRelapse);
+              .httpGet(allHttpMessages.httpGetRelapse, [
+                {
+                  name: 'pom_id',
+                  value: this.neuroGraphService.get('queryParams').pom_id
+                },
+                {
+                  name: 'startDate',
+                  value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.fromDate).format('MM/DD/YYYY')
+                },
+                {
+                  name: 'endDate',
+                  value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.toDate).format('MM/DD/YYYY')
+                }
+              ]);
           })();
       });
     let sub2 = relapses
@@ -123,7 +140,7 @@ export class RelapsesComponent implements OnInit {
           })();
       })
     //When zoom option changed
-    let sub4 = this.brokerService.filterOn(allMessages.zoomOptionChange).subscribe(d => {
+    let sub4 = this.brokerService.filterOn(allMessages.graphScaleUpdated).subscribe(d => {
       d.error ? console.log(d.error) : (() => {
         if (this.relapsisChartLoaded) {
           this.removeChart();
@@ -180,7 +197,6 @@ export class RelapsesComponent implements OnInit {
     d3.select('#relapses').selectAll("*").remove();
   }
   addChart() {
-    // debugger;
     var obj = {
       "relapse_id": this.relapsesData.length.toString(),
       "relapse_month": this.relapsesDetail.month,// (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString(),
@@ -210,7 +226,7 @@ export class RelapsesComponent implements OnInit {
     }
   }
   showSecondLevel(data) {
-    this.relapsesDetail = data;
+    this.relapsesDetail = {...data};
     if (data.save_csn_status == "Open") {
       this.isEditSelected = false;
       let dialogConfig = { hasBackdrop: true, panelClass: 'ns-relapses-theme', width: '405px' };
@@ -277,8 +293,8 @@ export class RelapsesComponent implements OnInit {
 
     this.pathUpdate = this.chart.append("path")
       .datum([
-        { "lastUpdatedDate": this.chartState.xDomain.defaultMinValue },
-        { "lastUpdatedDate": this.chartState.xDomain.defaultMaxValue }
+        { "lastUpdatedDate": this.chartState.xDomain.currentMinValue },
+        { "lastUpdatedDate": this.chartState.xDomain.currentMaxValue }
       ])
       .attr("class", "line")
       .attr("d", this.line)

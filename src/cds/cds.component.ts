@@ -4,8 +4,8 @@ import {NeuroGraphService} from '../neuro-graph.service';
 import {Observable} from 'rxjs/Observable';
 import {MdDialog} from '@angular/material';
 import {cdsMap, allMessages, manyHttpMessages, allHttpMessages} from '../neuro-graph.config';
-import {InfoPopupComponent} from './info-popup/info-popup.component'
-import moment from 'moment';
+import {InfoPopupComponent} from './info-popup/info-popup.component';
+import {ProgressNotesGeneratorService} from '@sutterhealth/progress-notes';
 
 @Component({selector: 'app-cds', templateUrl: './cds.component.html', styleUrls: ['./cds.component.scss'], encapsulation: ViewEncapsulation.None})
 export class CdsComponent implements OnInit {
@@ -13,12 +13,9 @@ export class CdsComponent implements OnInit {
   subscriptions : any;
   cdsInfo : any;
   cdsUserData : any;
-  cdsState : Object = {};
+  cdsState : any = {};
   csnState : any = {};
-  momentFunc: any;
-  constructor(private brokerService : BrokerService, private changeDetector : ChangeDetectorRef, private neuroGraphService : NeuroGraphService, public dialog : MdDialog) {
-    this.momentFunc = (moment as any).default ? (moment as any).default : moment;
-    this.momentFunc.locale('en');
+  constructor(private brokerService : BrokerService, private changeDetector : ChangeDetectorRef, private neuroGraphService : NeuroGraphService, public dialog : MdDialog, private progressNotesGeneratorService : ProgressNotesGeneratorService) {
     this.cdsState = {
       review_relapses: {
         checked: false
@@ -50,7 +47,7 @@ export class CdsComponent implements OnInit {
       review_vaccinations: {
         checked: false
       }
-    }
+    };
   }
 
   ngOnInit() {
@@ -108,18 +105,33 @@ export class CdsComponent implements OnInit {
       .subscribe(d => d.error
         ? console.log(d.error)
         : console.log(d.data));
+    let sub5 = this
+      .brokerService
+      .filterOn(allMessages.demographicEnableCheckBox)
+      .subscribe(d => d.error
+        ? console.log(d.error)
+        : this.cdsState.review_ms_type_status.checked=true);
     this
       .brokerService
       .httpGet(allHttpMessages.httpGetCdsInfo);
     this
       .brokerService
-      .httpGet(allHttpMessages.httpGetCdsUserData);
+      .httpGet(allHttpMessages.httpGetCdsUserData, [
+        {
+          name: 'pom_id',
+          value: this
+            .neuroGraphService
+            .get('queryParams')
+            .pom_id
+        }
+      ]);
     this
       .subscriptions
       .add(sub1)
       .add(sub2)
       .add(sub3)
-      .add(sub4);
+      .add(sub4)
+      .add(sub5);
   }
 
   saveChkBoxesState() {
@@ -127,7 +139,6 @@ export class CdsComponent implements OnInit {
       .brokerService
       .httpPost(allHttpMessages.httpPostCdsUserData, this.getCdsStateData());
   }
-
   getCdsStateData() {
     let cdsStateData : any = {};
     Object
@@ -143,11 +154,12 @@ export class CdsComponent implements OnInit {
       });
     cdsStateData.provider_id = this.cdsUserData.last_updated_provider_id;
     cdsStateData.encounter_csn = this.cdsUserData.save_csn;
-    // cdsStateData.updated_instant = '10/10/2017 11:11:11'; // moment().format('MM/DD/YYYY HH:mm:ss');   
-    cdsStateData.updated_instant = moment().format('MM/DD/YYYY HH:mm:ss'); 
+    cdsStateData.updated_instant = this
+      .neuroGraphService
+      .moment()
+      .format('MM/DD/YYYY HH:mm:ss');
     return (cdsStateData);
   }
-
   setChkBoxes() {
     Object
       .keys(this.cdsUserData)
@@ -160,11 +172,9 @@ export class CdsComponent implements OnInit {
       .changeDetector
       .detectChanges();
   }
-
   changed(event, item) {
     this.saveChkBoxesState();
   }
-
   openDialog(e, infoTitle) {
     let x = e.clientX;
     let y = e.clientY;
@@ -183,6 +193,32 @@ export class CdsComponent implements OnInit {
           y: y
         }
       });
+  }
+
+  progressNotes() {
+    let timestamp = this
+      .neuroGraphService
+      .moment()
+      .toString();
+    this
+      .progressNotesGeneratorService
+      .pushObject({
+        destination: 'progress-note',
+        category: 'progress-note',
+        source: 'MS-related-care',
+        title: 'MS related care',
+        editable: false,
+        draggable: true,
+        data: this.getMarkup(),
+        timestamp: timestamp,
+        overwrite: true
+      });
+  }
+
+  getMarkup() {
+    return (`
+      <h2>Informatio provided by clinician in MS related care</h2>
+    `);
   }
 
   ngOnDestroy() {

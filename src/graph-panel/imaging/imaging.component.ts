@@ -4,6 +4,7 @@ import { GRAPH_SETTINGS } from '../../neuro-graph.config';
 import { BrokerService } from '../../broker/broker.service';
 import { allMessages, allHttpMessages } from '../../neuro-graph.config';
 import { MdDialog, MdDialogRef, MD_DIALOG_DATA } from '@angular/material';
+import {NeuroGraphService} from '../../neuro-graph.service';
 
 @Component({
   selector: '[app-imaging]',
@@ -36,7 +37,7 @@ export class ImagingComponent implements OnInit {
   private reportDialogRef: any;
   private hasReportIcon: boolean = true;
   private hasBrainIcon: boolean = true;
-  constructor(private brokerService: BrokerService, public dialog: MdDialog, public reportDialog: MdDialog) { }
+  constructor(private brokerService: BrokerService, public dialog: MdDialog, public reportDialog: MdDialog, private neuroGraphService : NeuroGraphService) { }
 
   ngOnInit() {
     this.subscriptions = this
@@ -44,7 +45,9 @@ export class ImagingComponent implements OnInit {
       .filterOn(allHttpMessages.httpGetImaging)
       .subscribe(d => {
         d.error
-          ? console.log(d.error)
+          ?  (() => {
+            console.log(d.error)
+          })
           : (() => {
             this.imagingData = d.data.EPIC.patient[0].imagingOrders;
             this.createChart();
@@ -61,12 +64,26 @@ export class ImagingComponent implements OnInit {
       .filter(t => t.data.checked)
       .subscribe(d => {
         d.error
-          ? console.log(d.error)
+          ? (() => {
+            console.log(d.error)
+          })
           : (() => {
-            //make api call
             this
               .brokerService
-              .httpGet(allHttpMessages.httpGetImaging);
+              .httpGet(allHttpMessages.httpGetImaging, [
+                {
+                  name: 'pom_id',
+                  value: this.neuroGraphService.get('queryParams').pom_id
+                },
+                {
+                  name: 'startDate',
+                  value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.fromDate).format('MM/DD/YYYY')
+                },
+                {
+                  name: 'endDate',
+                  value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.toDate).format('MM/DD/YYYY')
+                }
+              ]);
           })();
       });
 
@@ -82,7 +99,7 @@ export class ImagingComponent implements OnInit {
       })
 
     //When zoom option changed
-    let sub3 = this.brokerService.filterOn(allMessages.zoomOptionChange).subscribe(d => {
+    let sub3 = this.brokerService.filterOn(allMessages.graphScaleUpdated).subscribe(d => {
       d.error ? console.log(d.error) : (() => {
         if (this.imagingChartLoaded) {
           this.removeChart();
@@ -204,8 +221,8 @@ export class ImagingComponent implements OnInit {
 
     this.pathUpdate = this.chart.append("path")
       .datum([
-        { "orderDate": this.chartState.xDomain.defaultMinValue },
-        { "orderDate": this.chartState.xDomain.defaultMaxValue }
+        { "orderDate": this.chartState.xDomain.currentMinValue },
+        { "orderDate": this.chartState.xDomain.currentMaxValue }
       ])
       .attr("d", this.lineA)
       .attr("stroke", GRAPH_SETTINGS.imaging.color)
@@ -234,7 +251,7 @@ export class ImagingComponent implements OnInit {
       .attr("cx", d => this.chartState.xScale(d.orderDate))
       .attr("cy", 0)
       .attr("r", 10)
-      .attr('class', 'x-axis-arrow')
+      .style('cursor', 'pointer')
       .style("stroke", GRAPH_SETTINGS.imaging.color)
       .style("fill", d => {
         let returnColor;
@@ -254,7 +271,7 @@ export class ImagingComponent implements OnInit {
       })
 
     this.chart.append("text")
-      .attr("transform", "translate(" + this.chartState.xScale(this.chartState.xDomain.defaultMinValue) + "," + "3.0" + ")")
+      .attr("transform", "translate(" + this.chartState.xScale(this.chartState.xDomain.currentMinValue) + "," + "3.0" + ")")
       .attr("dy", 0)
       .attr("text-anchor", "start")
       .attr("font-size", "10px")

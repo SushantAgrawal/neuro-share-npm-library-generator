@@ -4,6 +4,7 @@ import { GRAPH_SETTINGS } from '../../neuro-graph.config';
 import { BrokerService } from '../../broker/broker.service';
 import { allMessages, allHttpMessages, labsConfig } from '../../neuro-graph.config';
 import { MdDialog, MdDialogRef, MD_DIALOG_DATA } from '@angular/material';
+import {NeuroGraphService} from '../../neuro-graph.service';
 
 @Component({
   selector: '[app-labs]',
@@ -25,7 +26,7 @@ export class LabsComponent implements OnInit {
   private isCollapsed: Boolean = true;
   private dialogRef: any;
   private labsChartLoaded: boolean = false;
-  constructor(private brokerService: BrokerService, public dialog: MdDialog) { }
+  constructor(private brokerService: BrokerService, public dialog: MdDialog, private neuroGraphService : NeuroGraphService) { }
 
   ngOnInit() {
     this.subscriptions = this
@@ -33,9 +34,10 @@ export class LabsComponent implements OnInit {
       .filterOn(allHttpMessages.httpGetLabs)
       .subscribe(d => {
         d.error
-          ? console.log(d.error)
+          ? (() => {
+            console.log(d.error)
+          })
           : (() => {
-            //debugger;
             //this.labsData = d.data.EPIC.labOrder;
             this.labsData = d.data.EPIC.labOrder.filter(item => labsConfig.some(f => f["Lab Component ID"] == item.procedureCode));
             this.createChart();
@@ -52,12 +54,19 @@ export class LabsComponent implements OnInit {
       .filter(t => t.data.checked)
       .subscribe(d => {
         d.error
-          ? console.log(d.error)
+          ? (() => {
+            console.log(d.error)
+          })
           : (() => {
             //make api call
             this
               .brokerService
-              .httpGet(allHttpMessages.httpGetLabs);
+              .httpGet(allHttpMessages.httpGetLabs, [
+                {
+                  name: 'pom_id',
+                  value: this.neuroGraphService.get('queryParams').pom_id
+                }
+              ]);
           })();
       });
 
@@ -73,7 +82,7 @@ export class LabsComponent implements OnInit {
       })
 
     //When zoom option changed
-    let sub3 = this.brokerService.filterOn(allMessages.zoomOptionChange).subscribe(d => {
+    let sub3 = this.brokerService.filterOn(allMessages.graphScaleUpdated).subscribe(d => {
       d.error ? console.log(d.error) : (() => {
         if (this.labsChartLoaded) {
           this.removeChart();
@@ -93,7 +102,6 @@ export class LabsComponent implements OnInit {
     this.subscriptions.unsubscribe();
   }
   showSecondLevel(data) {
-    //debugger;
     this.labsDataDetails = data.orderDetails;
     let compArray: Array<any> = [];
     this.labsData.map(d => {
@@ -150,7 +158,6 @@ export class LabsComponent implements OnInit {
       this.plottrendline();
     });
 
-    //debugger;
     this
       .brokerService
       .emit(allMessages.neuroRelated, {
@@ -167,7 +174,6 @@ export class LabsComponent implements OnInit {
 
   }
   drawtrendLine(labId, compId, trendData) {
-    //debugger; 
     let maxValue = Math.max.apply(Math, trendData.map(function (o) { return o.y; }));
     let minValue = Math.min.apply(Math, trendData.map(function (o) { return o.y; }))
     let scale = d3.scaleLinear()
@@ -286,8 +292,8 @@ export class LabsComponent implements OnInit {
 
     this.pathUpdate = this.chart.append("path")
       .datum([
-        { "orderDate": this.chartState.xDomain.defaultMinValue },
-        { "orderDate": this.chartState.xDomain.defaultMaxValue }
+        { "orderDate": this.chartState.xDomain.currentMinValue },
+        { "orderDate": this.chartState.xDomain.currentMaxValue }
       ])
       .attr("d", this.line)
       .attr("stroke", GRAPH_SETTINGS.labs.color)
@@ -316,7 +322,7 @@ export class LabsComponent implements OnInit {
       .attr("cx", d => this.chartState.xScale(d.orderDate))
       .attr("cy", 0)
       .attr("r", 10)
-      .attr('class', 'x-axis-arrow')
+      .style('cursor', 'pointer')
       .style("stroke", GRAPH_SETTINGS.labs.color)
       .style("fill", d => {
         let returnColor;
@@ -336,7 +342,7 @@ export class LabsComponent implements OnInit {
       })
 
     this.chart.append("text")
-      .attr("transform", "translate(" + this.chartState.xScale(this.chartState.xDomain.defaultMinValue) + "," + "3.0" + ")")
+      .attr("transform", "translate(" + this.chartState.xScale(this.chartState.xDomain.currentMinValue) + "," + "3.0" + ")")
       .attr("dy", 0)
       .attr("text-anchor", "start")
       .attr("font-size", "10px")

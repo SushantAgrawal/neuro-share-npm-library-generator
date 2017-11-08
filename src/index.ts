@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { RouterModule, Routes } from '@angular/router';
 //UI Frameworks
-import { MdButtonModule,MdMenuModule, MdCheckboxModule, MdSelectModule, MdInputModule, MdDialogModule, MdTooltipModule, MdGridListModule} from '@angular/material';
+import { MdButtonModule, MdMenuModule, MdCheckboxModule, MdSelectModule, MdInputModule, MdDialogModule, MdTooltipModule, MdGridListModule, MatProgressSpinnerModule, MatSnackBarModule } from '@angular/material';
 //Custom Components, Services etc
 import { GraphPanelComponent } from './graph-panel/graph-panel.component';
 import { NeuroRelatedComponent } from './neuro-related/neuro-related.component';
@@ -18,7 +18,8 @@ import { RelapsesComponent } from './graph-panel/relapses/relapses.component';
 import { InfoPopupComponent } from './cds/info-popup/info-popup.component';
 import { ImagingComponent } from './graph-panel/imaging/imaging.component';
 import { LabsComponent } from './graph-panel/labs/labs.component';
-import { EvalModule} from '@sutterhealth/analytics';
+import { EvalModule } from '@sutterhealth/analytics';
+
 import { TwentyFiveFootWalkComponent } from './graph-panel/twenty-five-foot-walk/twenty-five-foot-walk.component';
 import { SymptomsComponent } from './graph-panel/symptoms/symptoms.component';
 
@@ -41,6 +42,8 @@ export const ROUTES: Routes = [];
     MdDialogModule,
     MdTooltipModule,
     MdGridListModule,
+    MatProgressSpinnerModule,
+    MatSnackBarModule,
     EvalModule.forRoot(),
   ],
   declarations: [
