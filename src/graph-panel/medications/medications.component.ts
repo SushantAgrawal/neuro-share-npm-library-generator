@@ -35,6 +35,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
   dmtArray: Array<any> = [];
   vitaminDArray: Array<any> = [];
   otherMedsArray: Array<any> = [];
+  registerDrag: any;
   selectedMed = {
     dmt: false,
     otherMeds: false,
@@ -63,14 +64,17 @@ export class MedicationsComponent implements OnInit, OnDestroy {
     'December'
   ];
 
-  constructor(private brokerService: BrokerService, private dialog: MdDialog, private neuroGraphService: NeuroGraphService) { }
+  constructor(private brokerService: BrokerService, private dialog: MdDialog, private neuroGraphService: NeuroGraphService) {
+    this.registerDrag = e => neuroGraphService.registerDrag(e);
+  }
 
   ngOnInit() {
     this.subscriptions = this.brokerService.filterOn('MEDICATIONS_ALL_DATA').subscribe(d => {
       d.error
         ? (() => {
-          console.log(d.error)
-        })
+          console.log(d.error);
+          this.brokerService.emit(allMessages.checkboxEnable, 'dmt');
+        })()
         : (() => {
           this.prepareMedications(d.data[0][allHttpMessages.httpGetMedications]);
           if (this.selectedMed[this.medType.dmt]) {
@@ -88,6 +92,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
           this.dmtSecondLayerLocalData = dmtResponse.DMTs;
           this.otherMedsSecondLayerLocalData = otherMedsResponse.Other_Meds;
           this.relapsesLocalData = relapsesLocalData.relapses;
+          this.brokerService.emit(allMessages.checkboxEnable, 'dmt');
         })();
     });
     let neuroRelated = this.brokerService.filterOn(allMessages.neuroRelated);
@@ -312,8 +317,8 @@ export class MedicationsComponent implements OnInit, OnDestroy {
           patient_reported_start: `${this.medSecondLayerModel.patientReportedStartDateMonth}/${this.medSecondLayerModel.patientReportedStartDateYear}`,
           reason_stopped: this.medSecondLayerModel.reasonStopped,
           other_reason: this.medSecondLayerModel.otherReason,
-          last_updated_provider_id: "G00123",
-          last_updated_instant: "09/30/2017 10:41:05",
+          last_updated_provider_id: "",
+          last_updated_instant: this.neuroGraphService.moment(new Date()).format('MM/DD/YYYY HH:mm:ss'),
           save_csn: this
             .neuroGraphService
             .get("queryParams")
@@ -344,8 +349,8 @@ export class MedicationsComponent implements OnInit, OnDestroy {
             .orderIdentifier
             .toString(),
           reason_for_med: this.medSecondLayerModel.reasonForMed,
-          last_updated_provider_id: "G00123",
-          last_updated_instant: "09/30/2017 10:41:05",
+          last_updated_provider_id: "",
+          last_updated_instant: this.neuroGraphService.moment(new Date()).format('MM/DD/YYYY HH:mm:ss'),
           save_csn: this
             .neuroGraphService
             .get("queryParams")
@@ -370,7 +375,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
       this.medSecondLayerModel = this.getSecondLayerModel(selectedData, this.medType.dmt, dmt);
       this.dialogRef = this.dialog.open(this.dmtSecondLevelTemplate, config);
     };
-    this.drawChart(this.dmtArray, this.medType.dmt, GRAPH_SETTINGS.medications.dmtColor, openSecondLayer);
+    this.drawChart(this.dmtArray, this.medType.dmt, GRAPH_SETTINGS.medications.dmtColor, GRAPH_SETTINGS.medications.dmtOverlapColor, openSecondLayer);
   }
 
   drawVitaminD() {
@@ -379,7 +384,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
       this.medSecondLayerModel = this.getSecondLayerModel(selectedData, this.medType.vitaminD, false);
       this.dialogRef = this.dialog.open(this.vitaminDSecondLevelTemplate, config);
     };
-    this.drawChart(this.vitaminDArray, this.medType.vitaminD, GRAPH_SETTINGS.medications.vitaminDColor, openSecondLayer);
+    this.drawChart(this.vitaminDArray, this.medType.vitaminD, GRAPH_SETTINGS.medications.vitaminDColor, GRAPH_SETTINGS.medications.vitaminDOverlapColor, openSecondLayer);
   }
 
   drawOtherMeds() {
@@ -389,7 +394,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
       this.medSecondLayerModel = this.getSecondLayerModel(selectedData, this.medType.otherMeds, otherMeds);
       this.dialogRef = this.dialog.open(this.otherMedsSecondLevelTemplate, config);
     };
-    this.drawChart(this.otherMedsArray, this.medType.otherMeds, GRAPH_SETTINGS.medications.otherMedsColor, openSecondLayer);
+    this.drawChart(this.otherMedsArray, this.medType.otherMeds, GRAPH_SETTINGS.medications.otherMedsColor, GRAPH_SETTINGS.medications.otherMedsOverlapColor, openSecondLayer);
   }
 
   removeDmt() {
@@ -418,7 +423,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
     return capitalize + ' ...';
   }
 
-  drawChart(allData: Array<any>, containterId, barColor, onClickCallback) {
+  drawChart(allData: Array<any>, containterId, barColor, overlapColor, onClickCallback) {
     let dataset = allData.filter(d => {
       //let dt = new Date(Date.parse(d.date.medStart || d.date.orderDate));
       //return dt >= this.chartState.xDomain.currentMinValue && dt <= this.chartState.xDomain.currentMaxValue;
@@ -445,7 +450,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
       .enter();
 
     //Draws rectangles
-    rectangles
+    let rect = rectangles
       .append('rect')
       .attr('rx', 0)
       .attr('ry', 0)
@@ -480,9 +485,76 @@ export class MedicationsComponent implements OnInit, OnDestroy {
       .on("click", d => {
         onClickCallback(d);
       })
+    // //overlapping areas
+    // let overlapColor = "grey";
+    // if (containterId == "dmt") {
+    //   overlapColor = "#303945";
+    // }
+    // else if (containterId == "otherMeds") {
+    //   overlapColor = "#898e90";
+    // }
+    // else if (containterId == "vitaminD") {
+    //   overlapColor = "#a07a1c";
+    // }
+    rect.each((d1, i, currentNodes) => {
+      const current = currentNodes[i];
+      let x1 = parseFloat(current.getAttribute("x"));
+      let y1 = parseFloat(current.getAttribute("y"));
+      let width1 = parseFloat(current.getAttribute("width"));
+
+      //overlap area
+      rect.each((d2, j, nextNodes) => {
+        const next = nextNodes[j];
+        let x2 = parseFloat(next.getAttribute("x"));
+        let y2 = parseFloat(next.getAttribute("y"));
+        let width2 = parseFloat(next.getAttribute("width"));
+        if (current !== next) {
+          if (x1 > x2 && (x2 + width2) > x1 && y1 == y2) {
+            //debugger;
+            let x = x1;
+            let y = y1;
+            let width = Math.abs(width2 - Math.abs(x2 - x1));
+            rectangles
+              .append('rect')
+              .attr('rx', 0)
+              .attr('ry', 0)
+              .attr('x', x)
+              .attr('y', y)
+              .attr('width', width)
+              .attr('height', 6)
+              .attr('stroke', 'none')
+              .attr('fill', overlapColor)
+              .style('cursor', 'pointer')
+              .on("click", d => {
+                onClickCallback(d);
+              })
+          }
+          else if (x1 > x2 && (x2 + width2) == x1 && y1 == y2) {
+            let x = x1;
+            let y = y1;
+            //let width = Math.abs(width2 - Math.abs(x2 - x1));
+            rectangles
+              .append('rect')
+              .attr('rx', 0)
+              .attr('ry', 0)
+              .attr('x', x)
+              .attr('y', y)
+              .attr('width', 1)
+              .attr('height', 6)
+              .attr('stroke', 'none')
+              .attr('fill', overlapColor)
+              .style('cursor', 'pointer')
+              .on("click", d => {
+                onClickCallback(d);
+              })
+          }
+        }
+
+      });
+    });
 
     //Draws texts
-    rectangles
+    let labels = rectangles
       .append('text')
       .text(d => this.getShortenedName(d.name))
       .attr('x', d => {
@@ -493,7 +565,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
         return pos < 0 ? 0 : pos;
       })
       .attr('y', function (d: any, i) {
-        for (var j = 0; j < groups.length; j++) {
+        for (let j = 0; j < groups.length; j++) {
           if (d.medication.id == groups[j]) {
             return j * 27 + 8;
           }
@@ -504,23 +576,42 @@ export class MedicationsComponent implements OnInit, OnDestroy {
       .attr('text-height', 40)
       .attr('fill', 'black')
       .style('text-transform', 'capitalize');
+    this.arrangeLabels(labels);
 
     //Adjusts height
-    d3
-      .select('#' + containterId)
+    d3.select('#' + containterId)
       .attr('height', groups.length * 30);
-    d3
-      .select('#' + containterId)
+    d3.select('#' + containterId)
       .style('display', 'block');
   }
 
+  arrangeLabels(labels) {
+    labels.each((d1, i, currentNodes) => {
+      const current = currentNodes[i];
+      let y1 = parseFloat(current.getAttribute('y'));
+      const x1 = parseFloat(current.getAttribute('x'));
+      const textLength1 = current.textContent.length * 5;
+      labels.each((d2, j, nextNodes) => {
+        const next = nextNodes[j];
+        if (current !== next) {
+          const x2 = parseFloat(next.getAttribute('x'));
+          const y2 = parseFloat(next.getAttribute('y'));
+          const textLength2 = next.textContent.length * 5;
+          if ((Math.abs(x1 - x2) < Math.abs(textLength1)) && (Math.abs(y1) === Math.abs(y2))) {
+            next.setAttribute('y', (y2 + 10 * (i + 1)).toString());
+            current.setAttribute('y', (y2 + 10 * (i + 2)).toString());
+            y1 = parseFloat(next.getAttribute('y'));
+          }
+        }
+      });
+    });
+  }
+
   removeChart(containterId) {
-    d3
-      .selectAll('#' + containterId)
-      .selectAll("*")
+    d3.selectAll('#' + containterId)
+      .selectAll('*')
       .remove();
-    d3
-      .select('#' + containterId)
+    d3.select('#' + containterId)
       .style('display', 'none');
   }
   //#endregion

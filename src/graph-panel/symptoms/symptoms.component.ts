@@ -34,7 +34,9 @@ export class SymptomsComponent implements OnInit {
   private questionaireData: Array<any>;
   private questionaireSymptomData: Array<any> = [];
   private symptomsChartLoaded: boolean = false;
+  registerDrag: any;
   constructor(private brokerService: BrokerService, public dialog: MdDialog, private neuroGraphService: NeuroGraphService) {
+    this.registerDrag = e => neuroGraphService.registerDrag(e);
     this.paramData = this.neuroGraphService.get('queryParams')
     this.setInnerSVGPolyfill();
   }
@@ -46,8 +48,9 @@ export class SymptomsComponent implements OnInit {
       .subscribe(d => {
         d.error
           ? (() => {
-            console.log(d.error)
-          })
+            console.log(d.error);
+            this.brokerService.emit(allMessages.checkboxEnable, 'symptoms');
+          })()
           : (() => {
             //this.questionaireData = d.data.questionaires.sort((a:any, b:any) => new Date(a["qx_completed_at"]) - b["qx_completed_at"]);
             this.questionaireData = d.data.questionaires.map(d => {
@@ -56,10 +59,10 @@ export class SymptomsComponent implements OnInit {
                 qxCompleted: new Date(this.neuroGraphService.moment(d["qx_completed_at"]).format("MM/DD/YYYY")),
               }
             }).sort((a, b) => b.qxCompleted - a.qxCompleted)
+            let index = 0;
 
             this.questionaireData.forEach(element => {
               let symptomsDataLocal: Array<any> = [];
-
               for (let i = 0; i < element.symptoms.length; i++) {
                 let symptomStatus: any = "";
                 let reportedDate: any;
@@ -67,7 +70,15 @@ export class SymptomsComponent implements OnInit {
                 reportedDate = element["qx_completed_at"];
                 qData.push(element.responses.filter(item => element.symptoms[i].qx_code.some(f => f == item["qx_code"])));
                 let prevCnt = 0;
-                let newCnt = this.questionaireData.length - 2;
+                let newCnt = this.questionaireData.length;
+                if (index == 0) {
+                  newCnt = this.questionaireData.length - 1;
+
+                }
+                else {
+                  newCnt = this.questionaireData.length - 2;
+
+                }
                 let trend: Array<any> = [];
                 let answerOptions: Array<any> = [];
                 let answerText: any = "";
@@ -121,12 +132,23 @@ export class SymptomsComponent implements OnInit {
                         cnt = cnt - 20;
                       }
                       else if (elem.symptoms[i].score != "") {
-                        trend.push({
-                          index: Number(elem.symptoms[i].score),
-                          x: cnt,
-                          score: elem.symptoms[i].score
+                        if (isNaN(elem.symptoms[i].score)) {
+                          trend.push({
+                            index: Number(elem.symptoms[i].score),
+                            x: cnt,
+                            score: elem.symptoms[i].score
 
-                        });
+                          });
+                        }
+                        else {
+                          trend.push({
+                            index: Number(elem.symptoms[i].score),
+                            x: cnt,
+                            score: elem.symptoms[i].score * 10
+
+                          });
+                        }
+
                         cnt = cnt - 20;
                       }
                     }
@@ -161,15 +183,25 @@ export class SymptomsComponent implements OnInit {
                     });
                   }
                   else if (element.symptoms[i].score != "") {
-                    trend.push({
-                      index: Number(element.symptoms[i].score),
-                      x: 60,
-                      score: element.symptoms[i].score
+                    if (isNaN(element.symptoms[i].score)) {
+                      trend.push({
+                        index: Number(element.symptoms[i].score),
+                        x: 60,
+                        score: element.symptoms[i].score
 
-                    });
+                      });
+                    }
+                    else {
+                      trend.push({
+                        index: Number(element.symptoms[i].score),
+                        x: 60,
+                        score: element.symptoms[i].score * 10
+
+                      });
+                    }
+
                   }
                 }
-
                 if (newCnt == 0) {
                   symptomStatus = "New";
                   trend = [];
@@ -188,7 +220,7 @@ export class SymptomsComponent implements OnInit {
                 var data = {
                   name: element.symptoms[i].title,
                   nameTrend: element.symptoms[i].title.split(' ').join('_'),
-                  score: element.symptoms[i].score,
+                  score: isNaN(element.symptoms[i].score) ? element.symptoms[i].score : element.symptoms[i].score * 10,
                   trendScore: trendScore,
                   qx_code: element.symptoms[i].qx_code,
                   symptomStatus: symptomStatus,
@@ -206,9 +238,11 @@ export class SymptomsComponent implements OnInit {
                 symptoms: symptomsDataLocal
 
               });
+              index++;
             });
             this.createChartSymptoms();
             this.symptomsChartLoaded = true;
+            this.brokerService.emit(allMessages.checkboxEnable, 'symptoms');
           })();
       })
     let symptoms = this
@@ -360,7 +394,7 @@ export class SymptomsComponent implements OnInit {
       return {
         ...d,
         questionnaireDate_mod: new Date(this.neuroGraphService.moment(d.questionnaireDate).format("MM/DD/YYYY")),
-       
+
       }
     }).sort((a, b) => a.questionnaireDate_mod - b.questionnaireDate_mod);
 
@@ -403,7 +437,7 @@ export class SymptomsComponent implements OnInit {
       .attr("width", "32")
       .attr("viewBox", "0 0 40 40")
       .html(svgImage)
-      .style('cursor', 'pointer')      
+      .style('cursor', 'pointer')
       .attr('d', this.pathUpdate)
       .on('click', d => {
         this.showSecondLevel(d);

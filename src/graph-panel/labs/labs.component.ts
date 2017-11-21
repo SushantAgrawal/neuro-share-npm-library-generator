@@ -4,7 +4,7 @@ import { GRAPH_SETTINGS } from '../../neuro-graph.config';
 import { BrokerService } from '../../broker/broker.service';
 import { allMessages, allHttpMessages, labsConfig } from '../../neuro-graph.config';
 import { MdDialog, MdDialogRef, MD_DIALOG_DATA } from '@angular/material';
-import {NeuroGraphService} from '../../neuro-graph.service';
+import { NeuroGraphService } from '../../neuro-graph.service';
 
 @Component({
   selector: '[app-labs]',
@@ -26,7 +26,11 @@ export class LabsComponent implements OnInit {
   private isCollapsed: Boolean = true;
   private dialogRef: any;
   private labsChartLoaded: boolean = false;
-  constructor(private brokerService: BrokerService, public dialog: MdDialog, private neuroGraphService : NeuroGraphService) { }
+  registerDrag: any;
+  constructor(private brokerService: BrokerService, public dialog: MdDialog, private neuroGraphService: NeuroGraphService) 
+  {
+    this.registerDrag = e => neuroGraphService.registerDrag(e);
+  }
 
   ngOnInit() {
     this.subscriptions = this
@@ -35,13 +39,15 @@ export class LabsComponent implements OnInit {
       .subscribe(d => {
         d.error
           ? (() => {
-            console.log(d.error)
-          })
+            console.log(d.error);
+            this.brokerService.emit(allMessages.checkboxEnable, 'labs');
+          })()
           : (() => {
             //this.labsData = d.data.EPIC.labOrder;
             this.labsData = d.data.EPIC.labOrder.filter(item => labsConfig.some(f => f["Lab Component ID"] == item.procedureCode));
             this.createChart();
             this.labsChartLoaded = true;
+            this.brokerService.emit(allMessages.checkboxEnable, 'labs');
           })();
       })
 

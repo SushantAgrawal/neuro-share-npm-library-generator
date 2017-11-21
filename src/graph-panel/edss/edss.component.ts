@@ -1,6 +1,7 @@
 import {
   Component,
   OnInit,
+  OnDestroy,
   Input,
   ViewChild,
   TemplateRef,
@@ -15,7 +16,7 @@ import { allMessages, allHttpMessages, medication, GRAPH_SETTINGS, edssScoreChar
 
 @Component({ selector: '[app-edss]', templateUrl: './edss.component.html', styleUrls: ['./edss.component.scss'], encapsulation: ViewEncapsulation.None })
 
-export class EdssComponent implements OnInit {
+export class EdssComponent implements OnInit, OnDestroy {
   @Input() chartState: any;
   @ViewChild('edssSecondLevelTemplate') edssSecondLevelTemplate: TemplateRef<any>;
   @ViewChild('edssScoreChartTemplate') edssScoreChartTemplate: TemplateRef<any>;
@@ -42,10 +43,13 @@ export class EdssComponent implements OnInit {
   datasetArea1: Array<any> = [];
   datasetArea2: Array<any> = [];
   datasetMean: Array<any> = [];
+  edssOpenAddPopUp: boolean = false;
+  registerDrag: any;
 
   constructor(private brokerService: BrokerService, private dialog: MatDialog, private neuroGraphService: NeuroGraphService) {
-
+    this.registerDrag = e => neuroGraphService.registerDrag(e);
   }
+
   ngOnInit() {
     this.edssPopupQuestions = edssScoreChart;
     this.edssPopupQuestions.map(x => x.checked = false);
@@ -61,7 +65,7 @@ export class EdssComponent implements OnInit {
         d.error
           ? (() => {
             console.log(d.error)
-          })
+          })()
           : (() => {
             this
               .brokerService
@@ -123,19 +127,31 @@ export class EdssComponent implements OnInit {
         d.error
           ? console.log(d.error)
           : (() => {
-            this.scoreChartOpType = "Add";
-            let dialogConfig = {
-              hasBackdrop: true,
-              panelClass: 'ns-edss-theme',
-              width: '670px',
-              height: '675px'
-            };
-            this.scoreChartDialogRef = this
-              .dialog
-              .open(this.edssScoreChartTemplate, dialogConfig);
-            this
-              .scoreChartDialogRef
-              .updatePosition({ top: '65px', left: '60px' });
+            let dt = d3.selectAll('.edss-charts');
+            if (dt["_groups"][0].length == 0) {
+              this.edssOpenAddPopUp = true;
+              this
+                .brokerService
+                .emit(allMessages.neuroRelated, {
+                  artifact: 'edss',
+                  checked: true
+                });
+            }
+            else {
+              this.scoreChartOpType = "Add";
+              let dialogConfig = {
+                hasBackdrop: true,
+                panelClass: 'ns-edss-theme',
+                width: '670px',
+                height: '675px'
+              };
+              this.scoreChartDialogRef = this
+                .dialog
+                .open(this.edssScoreChartTemplate, dialogConfig);
+              this
+                .scoreChartDialogRef
+                .updatePosition({ top: '65px', left: '60px' });
+            }
           })();
       });
 
@@ -179,8 +195,9 @@ export class EdssComponent implements OnInit {
       .subscribe(d => {
         d.error
           ? (() => {
-            console.log(d.error)
-          })
+            console.log(d.error);
+            this.brokerService.emit(allMessages.checkboxEnable, 'edss');
+          })()
           : (() => {
             let edssData = d.data[0][allHttpMessages.httpGetEdss].edss_scores;
             let quesData = d.data[1][allHttpMessages.httpGetAllQuestionnaire].questionaires;
@@ -211,6 +228,26 @@ export class EdssComponent implements OnInit {
             this.drawEdssYAxis();
             this.drawEdssLineCharts();
             this.edssChartLoaded = true;
+            if (this.edssOpenAddPopUp == true) {
+              this.edssOpenAddPopUp = false;
+              let dt = d3.selectAll('.edss-charts');
+              if (dt["_groups"][0].length > 0) {
+                this.scoreChartOpType = "Add";
+                let dialogConfig = {
+                  hasBackdrop: true,
+                  panelClass: 'ns-edss-theme',
+                  width: '670px',
+                  height: '675px'
+                };
+                this.scoreChartDialogRef = this
+                  .dialog
+                  .open(this.edssScoreChartTemplate, dialogConfig);
+                this
+                  .scoreChartDialogRef
+                  .updatePosition({ top: '65px', left: '60px' });
+              }
+            }
+            this.brokerService.emit(allMessages.checkboxEnable, 'edss');
           })();
       });
 
@@ -271,6 +308,7 @@ export class EdssComponent implements OnInit {
       .subscriptions
       .unsubscribe();
   }
+
   onSelectChartScore(index) {
     this
       .edssPopupQuestions
@@ -364,6 +402,7 @@ export class EdssComponent implements OnInit {
   }
 
   showSecondLevel(data) {
+    this.dialog.openDialogs.pop();
     let config = {
       hasBackdrop: true,
       panelClass: 'ns-edss-theme',
@@ -374,6 +413,13 @@ export class EdssComponent implements OnInit {
     this.secondLayerDialogRef = this
       .dialog
       .open(this.edssSecondLevelTemplate, config);
+
+
+    // setTimeout(() => {
+    //   let element: any = document.querySelector(('.cdk-overlay-pane'));
+    //   element.style.position = 'absolute';
+    //   this.neuroGraphService.dragElement(element);
+    // }, 3000)
   }
 
   drawEdssYAxis() {
@@ -503,7 +549,7 @@ export class EdssComponent implements OnInit {
         this.showSecondLevel(d);
       });
     //Adds labels for clinician data
-    svg
+    let labels1 = svg
       .selectAll('.label-clinician')
       .data(this.clinicianDataSet)
       .enter()
@@ -538,7 +584,7 @@ export class EdssComponent implements OnInit {
         this.showSecondLevel(d);
       });
     //Adds labels for patient data
-    svg
+    let labels2 = svg
       .selectAll('.label-patient')
       .data(this.patientDataSet)
       .enter()
@@ -548,9 +594,36 @@ export class EdssComponent implements OnInit {
       .attr('x', d => this.chartState.xScale(d.lastUpdatedDate) - 7)
       .attr('y', d => this.yScale(d.scoreValue) - 10)
       .text(d => oneDecimalFormat(d.scoreValue));
+    this.arrangeLabels(labels1, labels2);
+  }
+
+  arrangeLabels(labels1, labels2) {
+    labels1.each((d1, i, currentNodes) => {
+      const current = currentNodes[i];
+      let y1 = parseFloat(current.getAttribute('y'));
+      const x1 = parseFloat(current.getAttribute('x'));
+      const textLength1 = current.textContent.length * 5;
+      labels2.each((d2, j, nextNodes) => {
+        const next = nextNodes[j];
+        if (current !== next) {
+          const x2 = parseFloat(next.getAttribute('x'));
+          const y2 = parseFloat(next.getAttribute('y'));
+          const textLength2 = next.textContent.length * 5;
+          if ((Math.abs(x1 - x2) < Math.abs(textLength1)) && (Math.abs(y1) === Math.abs(y2))) {
+            next.setAttribute('y', (y2 - 2).toString());
+            current.setAttribute('y', (y2 + 28).toString());
+            y1 = parseFloat(next.getAttribute('y'));
+          }
+        }
+      });
+    });
   }
 
   drawVirtualCaseload() {
+    this.datasetArea1 = [];
+    this.datasetArea2 = [];
+    this.datasetMean = [];
+
     let line = d3.line<any>().x((d: any) => this.chartState.xScale(d.lastUpdatedDate)).y((d: any) => this.yScale(d.scoreValue));
 
     let svg = d3
@@ -573,11 +646,7 @@ export class EdssComponent implements OnInit {
       .push({ xDate: this.chartState.xDomain.currentMinValue, m: this.edssVirtualLoadDatam[0] });
 
     for (let i = 0; i < this.edssVirtualLoadDataLength; i++) {
-      let scaleMinYear = this
-        .chartState
-        .xDomain
-        .currentMinValue
-        .getFullYear();
+      let scaleMinYear = this.chartState.xDomain.currentMinValue.getFullYear();
       let date = new Date(scaleMinYear, 5, 30).getTime();
       if (i == 1) {
         date = new Date(scaleMinYear + 1, 5, 30).getTime();

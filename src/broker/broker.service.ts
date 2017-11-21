@@ -95,7 +95,7 @@ export class BrokerService {
               .next({ id: id, error: err });
             (--this.counter == 0) && (this.isHide = true);
             //temp implementation
-            this.subject.next({ id: this.errorMessageId, error: err });
+            this.subject.next({ id: this.errorMessageId, error: messages.httpGetUnknownError });
           });
       } else {
         this
@@ -135,7 +135,6 @@ export class BrokerService {
     try {
       this.isHide = false;
       this.counter++;
-      console.log(this.counter);
       let temp = queries.map(t => {
         let url = this.urlMaps[t.urlId];
         let myParams = new URLSearchParams();
@@ -188,7 +187,7 @@ export class BrokerService {
             .next({ id: messsageId, error: err });
           (--this.counter == 0) && (this.isHide = true);
           //temp implementation
-          this.subject.next({ id: this.errorMessageId, error: err });
+          this.subject.next({ id: this.errorMessageId, error: messages.httpGetUnknownError });
         });
 
     } catch (err) {

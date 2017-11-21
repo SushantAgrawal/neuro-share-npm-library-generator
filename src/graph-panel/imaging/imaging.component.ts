@@ -4,7 +4,7 @@ import { GRAPH_SETTINGS } from '../../neuro-graph.config';
 import { BrokerService } from '../../broker/broker.service';
 import { allMessages, allHttpMessages } from '../../neuro-graph.config';
 import { MdDialog, MdDialogRef, MD_DIALOG_DATA } from '@angular/material';
-import {NeuroGraphService} from '../../neuro-graph.service';
+import { NeuroGraphService } from '../../neuro-graph.service';
 
 @Component({
   selector: '[app-imaging]',
@@ -35,9 +35,12 @@ export class ImagingComponent implements OnInit {
   private datasetC: Array<any> = [];
   private dialogRef: any;
   private reportDialogRef: any;
-  private hasReportIcon: boolean = true;
-  private hasBrainIcon: boolean = true;
-  constructor(private brokerService: BrokerService, public dialog: MdDialog, public reportDialog: MdDialog, private neuroGraphService : NeuroGraphService) { }
+  private imagingReportDetails: any;
+  registerDrag: any;
+  constructor(private brokerService: BrokerService, public dialog: MdDialog, public reportDialog: MdDialog, private neuroGraphService: NeuroGraphService)
+   { 
+    this.registerDrag = e => neuroGraphService.registerDrag(e);
+   }
 
   ngOnInit() {
     this.subscriptions = this
@@ -45,13 +48,15 @@ export class ImagingComponent implements OnInit {
       .filterOn(allHttpMessages.httpGetImaging)
       .subscribe(d => {
         d.error
-          ?  (() => {
-            console.log(d.error)
-          })
+          ? (() => {
+            console.log(d.error);
+            this.brokerService.emit(allMessages.checkboxEnable, 'imaging');
+          })()
           : (() => {
             this.imagingData = d.data.EPIC.patient[0].imagingOrders;
             this.createChart();
             this.imagingChartLoaded = true;
+            this.brokerService.emit(allMessages.checkboxEnable, 'imaging');
           })();
       })
 
@@ -126,8 +131,9 @@ export class ImagingComponent implements OnInit {
     this.dialogRef = this.dialog.open(this.imagingSecondLevelTemplate, dialogConfig);
   }
 
-  showResult() {
+  showResult(imagingObj) {
     this.dialog.openDialogs.pop();
+    this.imagingReportDetails = imagingObj;
     let dialogConfig = { hasBackdrop: false, skipHide: true, panelClass: 'ns-images-theme', width: '490px', height: '600px' };
     this.reportDialogRef = this.dialog.open(this.imagingThirdLevelTemplate, dialogConfig);
     this.reportDialogRef.updatePosition({ top: '50px', left: "860px" });

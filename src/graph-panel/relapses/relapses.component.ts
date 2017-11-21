@@ -35,9 +35,13 @@ export class RelapsesComponent implements OnInit {
   private datasetA: Array<any>;
   private relapsesData: Array<any>;
   private isEditSelected: boolean = false;
+  private relapsesOpenAddPopUp: boolean = false;
+  private isDateOutOfRange: boolean = false;
   private relapsisChartLoaded: boolean = false;
+  registerDrag: any;
   constructor(private brokerService: BrokerService, public dialog: MdDialog, private neuroGraphService: NeuroGraphService) {
     this.paramData = this.neuroGraphService.get('queryParams')
+    this.registerDrag = e => neuroGraphService.registerDrag(e);
   }
   ngOnInit() {
     for (var i = 2017; i >= 1917; i--) {
@@ -49,12 +53,27 @@ export class RelapsesComponent implements OnInit {
       .subscribe(d => {
         d.error
           ? (() => {
-            console.log(d.error)
-          })
+            console.log(d.error);
+            this.brokerService.emit(allMessages.checkboxEnable, 'relapses');
+          })()
           : (() => {
             this.relapsesData = d.data.relapses;
             this.createChart();
             this.relapsisChartLoaded = true;
+            if (this.relapsesOpenAddPopUp == true) {
+              this.relapsesOpenAddPopUp = false;
+              let dt = d3.select('#relapses').selectAll("*");
+              if (dt["_groups"][0].length > 0) {
+                this.isDateOutOfRange = false;
+                this.relapsesDetail = this.relapsesData[0];
+                this.relapsesDetail.month = "";
+                this.relapsesDetail.year = "";//new Date().getFullYear().toString();
+                let dialogConfig = { hasBackdrop: true, panelClass: 'ns-relapses-theme', width: '250px' };
+                this.dialogRef = this.dialog.open(this.relapsesAddSecondLevelTemplate, dialogConfig);
+                this.dialogRef.updatePosition({ top: '335px', left: '255px' });
+              }
+            }
+            this.brokerService.emit(allMessages.checkboxEnable, 'relapses');
           })();
       })
     let relapses = this
@@ -129,7 +148,18 @@ export class RelapsesComponent implements OnInit {
         d.error
           ? console.log(d.error)
           : (() => {
-            if (typeof this.relapsesData != "undefined" && this.relapsesData != null) {
+            let dt = d3.select('#relapses').selectAll("*");
+            if (dt["_groups"][0].length == 0) {
+              this.relapsesOpenAddPopUp = true;
+              this
+                .brokerService
+                .emit(allMessages.neuroRelated, {
+                  artifact: 'relapses',
+                  checked: true
+                });
+            }
+            else {
+              this.isDateOutOfRange = false;
               this.relapsesDetail = this.relapsesData[0];
               this.relapsesDetail.month = "";
               this.relapsesDetail.year = "";//new Date().getFullYear().toString();
@@ -137,6 +167,7 @@ export class RelapsesComponent implements OnInit {
               this.dialogRef = this.dialog.open(this.relapsesAddSecondLevelTemplate, dialogConfig);
               this.dialogRef.updatePosition({ top: '335px', left: '255px' });
             }
+
           })();
       })
     //When zoom option changed
@@ -175,60 +206,73 @@ export class RelapsesComponent implements OnInit {
     this.createChart();
   }
   updateChart() {
-    this.dialogRef.close();
-    var objIndex = this.relapsesData.findIndex((obj => obj.relapse_id == this.relapsesDetail.relapse_id));
-    this.relapsesData[objIndex].last_updated_instant = (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString() + "/15/" + this.relapsesDetail.year;
-    this.relapsesData[objIndex].clinician_confirmed = this.relapsesDetail.confirm;
-    this.relapsesData[objIndex].relapse_month = this.relapsesDetail.month,
-      this.relapsesData[objIndex].relapse_year = this.relapsesDetail.year,
+    //debugger;
+    if (this.relapsesDetail.year >= new Date().getFullYear() && new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() > new Date().getMonth()) {
+      this.isDateOutOfRange = true;
+    }
+    else {
+      this.dialogRef.close();
+      var objIndex = this.relapsesData.findIndex((obj => obj.relapse_id == this.relapsesDetail.relapse_id));
+      this.relapsesData[objIndex].last_updated_instant = (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString() + "/15/" + this.relapsesDetail.year;
+      this.relapsesData[objIndex].clinician_confirmed = this.relapsesDetail.confirm;
+      this.relapsesData[objIndex].relapse_month = this.relapsesDetail.month;
+      this.relapsesData[objIndex].relapse_year = this.relapsesDetail.year;
       this.removeChart();
-    this.createChart();
+      this.createChart();
 
-    let obj = {
-      "pom_id": this.paramData.pom_id,
-      "relapse_id": this.relapsesData[objIndex].relapse_id,
-      "provider_id": this.relapsesData[objIndex].last_updated_provider_id,
-      "encounter_csn": this.paramData.csn,
-      "updated_instant": (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString() + "/15/" + this.relapsesDetail.year,
-      "clinician_confirmed": this.relapsesData[objIndex].clinician_confirmed
-    };
+      let obj = {
+        "pom_id": this.paramData.pom_id,
+        "relapse_id": this.relapsesData[objIndex].relapse_id,
+        "provider_id": this.relapsesData[objIndex].last_updated_provider_id,
+        "encounter_csn": this.paramData.csn,
+        "updated_instant": (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString() + "/15/" + this.relapsesDetail.year,
+        "clinician_confirmed": this.relapsesData[objIndex].clinician_confirmed
+      };
+    }
+
   }
   removeChart() {
     d3.select('#relapses').selectAll("*").remove();
   }
   addChart() {
-    var obj = {
-      "relapse_id": this.relapsesData.length.toString(),
-      "relapse_month": this.relapsesDetail.month,// (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString(),
-      "relapse_year": this.relapsesDetail.year,
-      "last_updated_provider_id": "",
-      "save_csn": this.paramData.csn,
-      "save_csn_status": this.paramData.encounter_status,
-      "last_updated_instant": (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString() + "/15/" + this.relapsesDetail.year,
-      "patient_reported": true,
-      "qx_id": "",
-      "clinician_confirmed": true,
-      "relapseaxis": "2.0"
+    if (this.relapsesDetail.year >= new Date().getFullYear() && new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() > new Date().getMonth()) {
+      this.isDateOutOfRange = true;
     }
+    else {
+      var obj = {
+        "relapse_id": this.relapsesData.length.toString(),
+        "relapse_month": this.relapsesDetail.month,// (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString(),
+        "relapse_year": this.relapsesDetail.year,
+        "last_updated_provider_id": "",
+        "save_csn": this.paramData.csn,
+        "save_csn_status": this.paramData.encounter_status,
+        "last_updated_instant": (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString() + "/15/" + this.relapsesDetail.year,
+        "patient_reported": true,
+        "qx_id": "",
+        "clinician_confirmed": true,
+        "relapseaxis": "2.0"
+      }
 
-    this.relapsesData.push(obj);
-    this.dialogRef.close();
-    this.removeChart();
-    this.createChart();
+      this.relapsesData.push(obj);
+      this.dialogRef.close();
+      this.removeChart();
+      this.createChart();
 
-    let objSave = {
-      "pom_id": this.paramData.pom_id,
-      "relapse_month": this.month[new Date(obj.last_updated_instant).getMonth()],
-      "relapse_year": this.relapsesDetail.year,
-      "provider_id": "",
-      "encounter_csn": this.paramData.csn,
-      "updated_instant": (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString() + "/15/" + this.relapsesDetail.year
+      let objSave = {
+        "pom_id": this.paramData.pom_id,
+        "relapse_month": this.month[new Date(obj.last_updated_instant).getMonth()],
+        "relapse_year": this.relapsesDetail.year,
+        "provider_id": "",
+        "encounter_csn": this.paramData.csn,
+        "updated_instant": (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString() + "/15/" + this.relapsesDetail.year
+      }
     }
   }
   showSecondLevel(data) {
-    this.relapsesDetail = {...data};
+    this.relapsesDetail = { ...data };
     if (data.save_csn_status == "Open") {
       this.isEditSelected = false;
+      this.isDateOutOfRange = false;
       let dialogConfig = { hasBackdrop: true, panelClass: 'ns-relapses-theme', width: '405px' };
       this.dialogRef = this.dialog.open(this.relapsesEditSecondLevelTemplate, dialogConfig);
     }
@@ -249,6 +293,10 @@ export class RelapsesComponent implements OnInit {
   }
   valChng() {
     this.isEditSelected = true;
+    this.isDateOutOfRange = false;
+  }
+  addChng() {
+    this.isDateOutOfRange = false;
   }
   createChart() {
     this.datasetB = this.relapsesData.map(d => {

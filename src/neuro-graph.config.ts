@@ -6,7 +6,8 @@ export const allMessages = {
   'toggleVirtualCaseload': 'toggle:virtual:caseload',
   'graphScaleUpdated': 'graph:scale:updated',
   'timelineScroll': 'timeline:scroll',
-  'demographicEnableCheckBox':'demographic:enable:check:box'
+  'demographicEnableCheckBox': 'demographic:enable:check:box',
+  'checkboxEnable': 'checkbox:enable',
 };
 
 export const manyHttpMessages = {
@@ -32,31 +33,10 @@ export const allHttpMessages = {
   'httpGetWalk25Feet': 'http:get:walk25Feet',
   'httpGetWalk25FeetInfo': 'http:get:walk25Feet:info',
   'httpGetSymptoms': 'http:get:symptoms',
-  'httpGetReferenceLine': 'http:get:referenceLine'
+  'httpGetReferenceLine': 'http:get:referenceLine',
+  'httpGeProgressNote': 'http:get:progressNote'
 };
-export const urlMaps = {
-
-  "http:get:medications": "http://private-242c4d-ehr2.apiary-mock.com/maestro/api/ehr/medications-orders/",
-  "http:get:edss": "https://private-anon-517d57d1fe-neuroshareapis.apiary-mock.com/neuroshare/api/ms/edss-score/",
-  "http:get:cds:info": "http://private-anon-293c93a712-neuroshareapis.apiary-mock.com/neuroshare/api/ms/cds-info/",
-  "http:get:cds:user:data": "https://private-anon-293c93a712-neuroshareapis.apiary-mock.com/neuroshare/api/ms/cds/",
-  "http:put:cds:user:data": "https://private-anon-293c93a712-neuroshareapis.apiary-mock.com/neuroshare/api/ms/cds/",
-  "http:post:cds:user:data": "https://private-anon-293c93a712-neuroshareapis.apiary-mock.com/neuroshare/api/ms/cds/",
-  "http:get:dmt": "https://private-anon-a39e22dbbe-neuroshareapis.apiary-mock.com/neuroshare/api/ms/dmt/",
-  "http:get:relapse": "https://private-anon-221223bd22-neuroshareapis.apiary-mock.com/neuroshare/api/ms/relapses/",
-  "http:put:relapse": "https://private-anon-221223bd22-neuroshareapis.apiary-mock.com/neuroshare/api/ms/relapse",
-  "http:post:relapse": "https://private-anon-221223bd22-neuroshareapis.apiary-mock.com/neuroshare/api/ms/relapses",
-  "http:delete:relapse": "https://private-anon-221223bd22-neuroshareapis.apiary-mock.com/neuroshare/api/ms/relapse",
-  "http:get:all:questionnaire": "https://private-anon-a39e22dbbe-neuroshareapis.apiary-mock.com/neuroshare/api/all-questionnaire-responses/",
-  "http:get:otherMeds": "https://private-anon-a39e22dbbe-neuroshareapis.apiary-mock.com/neuroshare/api/ms/other-meds/",
-  "http:get:imaging": "https://private-anon-221223bd22-neuroshareapis.apiary-mock.com/neuroshare/api/ms/imaging-orders/",
-  "http:get:labs": "https://private-anon-221223bd22-neuroshareapis.apiary-mock.com/neuroshare/api/ms/lab-orders/",
-  "http:get:virtualCaseLoad": "https://private-anon-221223bd22-neuroshareapis.apiary-mock.com/neuroshare/api/ms/ms-population-data/",
-  "http:get:walk25Feet": "https://private-anon-221223bd22-neuroshareapis.apiary-mock.com/neuroshare/api/ms/25walk/",
-  "http:get:walk25Feet:info": "https://private-anon-221223bd22-neuroshareapis.apiary-mock.com/neuroshare/api/ms/25walk-info/",
-  "http:get:symptoms": "https://private-anon-7ea2a62b33-neuroshareapis.apiary-mock.com/neuroshare/api/all-questionnaire-responses/",
-  "http:get:referenceLine":"https://private-242c4d-ehr2.apiary-mock.com/maestro/api/ehr/encounters/"
-};
+export const urlMaps = window["gUrlMaps"];
 
 export const cdsMap = {
   dmt: ['review_dmts'],
@@ -264,8 +244,12 @@ export const GRAPH_SETTINGS = {
     containerHeight: 110,
     chartsWidth: 665,
     dmtColor: "#607D8B",
+    dmtOverlapColor: "#303945",
     vitaminDColor: "#FBC02D",
-    otherMedsColor: "#D8DFE2"
+    vitaminDOverlapColor: "#A07A1C",
+    otherMedsColor: "#D8DFE2",
+    otherMedsOverlapColor: "#898E90"
+
   },
   edss: {
     positionTop: 300,
