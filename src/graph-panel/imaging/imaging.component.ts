@@ -37,10 +37,9 @@ export class ImagingComponent implements OnInit {
   private reportDialogRef: any;
   private imagingReportDetails: any;
   registerDrag: any;
-  constructor(private brokerService: BrokerService, public dialog: MdDialog, public reportDialog: MdDialog, private neuroGraphService: NeuroGraphService)
-   { 
+  constructor(private brokerService: BrokerService, public dialog: MdDialog, public reportDialog: MdDialog, private neuroGraphService: NeuroGraphService) {
     this.registerDrag = e => neuroGraphService.registerDrag(e);
-   }
+  }
 
   ngOnInit() {
     this.subscriptions = this
@@ -57,6 +56,12 @@ export class ImagingComponent implements OnInit {
             this.createChart();
             this.imagingChartLoaded = true;
             this.brokerService.emit(allMessages.checkboxEnable, 'imaging');
+            //custom error handling
+            if (this.imagingData.length == 0)
+              this.brokerService.emit(allMessages.showCustomError, 'M-002');
+            else if (this.imagingData.some(m => m.orderDate == '' || m.orderDate == 'No result'))
+              this.brokerService.emit(allMessages.showCustomError, 'D-001');
+          
           })();
       })
 
@@ -129,6 +134,7 @@ export class ImagingComponent implements OnInit {
     this.imagingDataDetails = data.orderDetails;
     let dialogConfig = { hasBackdrop: true, skipHide: true, panelClass: 'ns-images-theme', width: '375px' };
     this.dialogRef = this.dialog.open(this.imagingSecondLevelTemplate, dialogConfig);
+    this.dialogRef.updatePosition({ top: `${d3.event.clientY - 180}px`, left: `${d3.event.clientX - 190}px` });
   }
 
   showResult(imagingObj) {
@@ -136,7 +142,7 @@ export class ImagingComponent implements OnInit {
     this.imagingReportDetails = imagingObj;
     let dialogConfig = { hasBackdrop: false, skipHide: true, panelClass: 'ns-images-theme', width: '490px', height: '600px' };
     this.reportDialogRef = this.dialog.open(this.imagingThirdLevelTemplate, dialogConfig);
-    this.reportDialogRef.updatePosition({ top: '50px', left: "860px" });
+    this.reportDialogRef.updatePosition({ top: '70px', left: "860px" });
   }
 
   removeChart() {

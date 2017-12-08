@@ -44,7 +44,7 @@ export class SymptomsComponent implements OnInit {
 
     this.subscriptions = this
       .brokerService
-      .filterOn(allHttpMessages.httpGetSymptoms)
+      .filterOn(allHttpMessages.httpGetAllQuestionnaire)
       .subscribe(d => {
         d.error
           ? (() => {
@@ -220,7 +220,7 @@ export class SymptomsComponent implements OnInit {
                 var data = {
                   name: element.symptoms[i].title,
                   nameTrend: element.symptoms[i].title.split(' ').join('_'),
-                  score: isNaN(element.symptoms[i].score) ? element.symptoms[i].score : element.symptoms[i].score * 10,
+                  score: isNaN(element.symptoms[i].score) ? element.symptoms[i].score : element.symptoms[i].score == 0 ? '' : element.symptoms[i].score * 10,
                   trendScore: trendScore,
                   qx_code: element.symptoms[i].qx_code,
                   symptomStatus: symptomStatus,
@@ -243,6 +243,29 @@ export class SymptomsComponent implements OnInit {
             this.createChartSymptoms();
             this.symptomsChartLoaded = true;
             this.brokerService.emit(allMessages.checkboxEnable, 'symptoms');
+
+            //custom error handling
+            var isValidDate = true;
+            var isComplete = true;
+            this.questionaireSymptomData.forEach(obj => {
+              if (obj.status.toUpperCase() != "COMPLETED") {
+                isComplete = false;
+              }
+              if (obj.symptoms.some(symp => symp.score == 'No result'))
+                isValidDate = false;
+            });
+            var ErrorCode: string = '';
+            if (this.questionaireSymptomData.length == 0)
+              this.brokerService.emit(allMessages.showCustomError, 'M-002');
+            else {
+              if (!isValidDate)
+                ErrorCode = ErrorCode.indexOf('D-002') != -1 ? ErrorCode : ErrorCode == '' ? 'D-002' : ErrorCode + ',' + 'D-002';
+              if (!isComplete)
+                ErrorCode = ErrorCode.indexOf('U-004') != -1 ? ErrorCode : ErrorCode == '' ? 'U-004' : ErrorCode + ',' + 'U-004';
+                if (ErrorCode != '')
+                this.brokerService.emit(allMessages.showCustomError, ErrorCode);
+            }
+           
           })();
       })
     let symptoms = this
@@ -261,7 +284,7 @@ export class SymptomsComponent implements OnInit {
             //make api call
             this
               .brokerService
-              .httpGet(allHttpMessages.httpGetSymptoms, [
+              .httpGet(allHttpMessages.httpGetAllQuestionnaire, [
                 {
                   name: 'pom_id',
                   value: this.neuroGraphService.get('queryParams').pom_id
@@ -321,8 +344,9 @@ export class SymptomsComponent implements OnInit {
 
   showSecondLevel(data) {
     this.symptomsData = data;
-    let dialogConfig = { hasBackdrop: false, panelClass: 'ns-symptoms-theme', width: '750px' };
+    let dialogConfig = { panelClass: 'ns-symptoms-theme', width: '750px' };
     this.dialogRef = this.dialog.open(this.symptomSecondLevelTemplate, dialogConfig);
+    this.dialogRef.updatePosition({ top: '153px', left: '278px' });
     this.dialogRef.afterOpen().subscribe((ref: MdDialogRef<any>) => {
       this.plottrendlineSymptoms();
     });
@@ -385,8 +409,9 @@ export class SymptomsComponent implements OnInit {
   showThirdLayer(dataDet) {
     this.symptomsDataDetails = dataDet;
     this.dialog.openDialogs.pop();
-    let dialogConfig = { hasBackdrop: false, skipHide: true, panelClass: 'ns-symptoms-theme', width: '350px', height: '350px' };
+    let dialogConfig = { panelClass: 'ns-symptoms-theme', width: '350px', height: '350px' };
     this.questDialogRef = this.dialog.open(this.symptomsThirdLevelTemplate, dialogConfig);
+    this.questDialogRef.updatePosition({ top: '250px', left: '465px' });
   }
 
   createChartSymptoms() {

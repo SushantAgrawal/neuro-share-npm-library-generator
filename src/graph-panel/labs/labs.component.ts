@@ -27,8 +27,9 @@ export class LabsComponent implements OnInit {
   private dialogRef: any;
   private labsChartLoaded: boolean = false;
   registerDrag: any;
-  constructor(private brokerService: BrokerService, public dialog: MdDialog, private neuroGraphService: NeuroGraphService) 
-  {
+  private labsDataStatic: any;
+
+  constructor(private brokerService: BrokerService, public dialog: MdDialog, private neuroGraphService: NeuroGraphService) {
     this.registerDrag = e => neuroGraphService.registerDrag(e);
   }
 
@@ -43,11 +44,17 @@ export class LabsComponent implements OnInit {
             this.brokerService.emit(allMessages.checkboxEnable, 'labs');
           })()
           : (() => {
-            //this.labsData = d.data.EPIC.labOrder;
+
             this.labsData = d.data.EPIC.labOrder.filter(item => labsConfig.some(f => f["Lab Component ID"] == item.procedureCode));
             this.createChart();
             this.labsChartLoaded = true;
             this.brokerService.emit(allMessages.checkboxEnable, 'labs');
+            //custom error handling
+            if (this.labsData.length == 0)
+              this.brokerService.emit(allMessages.showCustomError, 'M-002');
+            else if (this.labsData.some(m => m.orderDate == '' || m.orderDate == 'No result'))
+              this.brokerService.emit(allMessages.showCustomError, 'D-001');
+          
           })();
       })
 
@@ -71,6 +78,14 @@ export class LabsComponent implements OnInit {
                 {
                   name: 'pom_id',
                   value: this.neuroGraphService.get('queryParams').pom_id
+                },
+                {
+                  name: 'startDate',
+                  value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.fromDate).format('MM/DD/YYYY')
+                },
+                {
+                  name: 'endDate',
+                  value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.toDate).format('MM/DD/YYYY')
                 }
               ]);
           })();
@@ -160,6 +175,7 @@ export class LabsComponent implements OnInit {
     let dialogConfig = { hasBackdrop: false, skipHide: true, panelClass: 'ns-labs-theme', width: '730px', data: this.labsDataDetails };
 
     this.dialogRef = this.dialog.open(this.labSecondLevelTemplate, dialogConfig);
+    this.dialogRef.updatePosition({ top: '153px', left: '290px' });
     this.dialogRef.afterOpen().subscribe((ref: MdDialogRef<any>) => {
       this.plottrendline();
     });
@@ -174,7 +190,9 @@ export class LabsComponent implements OnInit {
   plottrendline() {
     if (this.labsDataDetails[0].component.length > 0) {
       this.labsDataDetails[0].component.forEach(elems => {
-        this.drawtrendLine(this.labsDataDetails[0].procedureCode, elems.id, elems.trendData)
+        if (elems.trendData.length > 0) {
+          this.drawtrendLine(this.labsDataDetails[0].procedureCode, elems.id, elems.trendData)
+        }
       });
     }
 
@@ -191,7 +209,6 @@ export class LabsComponent implements OnInit {
       .y((d: any) => scale(d.y))
 
     //Drawing container
-
     let svg = d3
       .select('#TrendLine_' + labId + '_' + compId)
       .append('svg')

@@ -8,33 +8,48 @@ export const allMessages = {
   'timelineScroll': 'timeline:scroll',
   'demographicEnableCheckBox': 'demographic:enable:check:box',
   'checkboxEnable': 'checkbox:enable',
+  'showCustomError': 'show:custom:error'
+
 };
 
 export const manyHttpMessages = {
   'httpGetInitialApiCall': 'http:get:initial:api:call',
 };
 export const allHttpMessages = {
-  'httpGetMedications': 'http:get:medications',
+  'httpGetWalk25Feet': 'http:get:walk25Feet',
+  'httpPostWalk25Feet': 'http:post:walk25Feet',
+  'httpPutWalk25Feet': 'http:put:walk25Feet',
+
   'httpGetEdss': 'http:get:edss',
-  'httpGetCdsInfo': 'http:get:cds:info',
-  'httpGetCdsUserData': 'http:get:cds:user:data',
-  'httpPutCdsUserData': 'http:put:cds:user:data',
-  'httpPostCdsUserData': 'http:post:cds:user:data',
-  'httpGetDmt': 'http:get:dmt',
+  'httpPostEdss': 'http:post:edss',
+  'httpPutEdss': 'http:put:edss',
+
   'httpGetRelapse': 'http:get:relapse',
   'httpPutRelapse': 'http:put:relapse',
   'httpPostRelapse': 'http:post:relapse',
-  'httpDeleteRelapse': 'http:delete:relapse',
-  'httpGetAllQuestionnaire': 'http:get:all:questionnaire',
+
+  'httpGetDmt': 'http:get:dmt',
+  'httpPostDmt': 'http:post:dmt',
+  'httpPutDmt': 'http:put:dmt',
+
   'httpGetOtherMeds': 'http:get:otherMeds',
+  'httpPostOtherMeds': 'http:post:otherMeds',
+  'httpPutOtherMeds': 'http:put:otherMeds',
+
+  'httpGetCdsUserData': 'http:get:cds:user:data',
+  'httpPutCdsUserData': 'http:put:cds:user:data',
+  'httpPostCdsUserData': 'http:post:cds:user:data',
+
+  'httpGetAllQuestionnaire': 'http:get:all:questionnaire',
   'httpGetImaging': 'http:get:imaging',
   'httpGetLabs': 'http:get:labs',
   'httpGetVirtualCaseLoad': 'http:get:virtualCaseLoad',
-  'httpGetWalk25Feet': 'http:get:walk25Feet',
   'httpGetWalk25FeetInfo': 'http:get:walk25Feet:info',
-  'httpGetSymptoms': 'http:get:symptoms',
-  'httpGetReferenceLine': 'http:get:referenceLine',
-  'httpGeProgressNote': 'http:get:progressNote'
+  'httpGetCdsInfo': 'http:get:cds:info',
+
+  'httpGetMedications': 'http:get:medications',
+  'httpGetEncounters': 'http:get:encounters',
+  'httpGetProgressNote': 'http:get:progressNote'
 };
 export const urlMaps = window["gUrlMaps"];
 
@@ -292,6 +307,11 @@ export const errorMessages = {
   'D-002': { type: 'Data Error', message: 'Unexpected data that cannot be plotted - Source other than Epic sometimes contains text values that read "No result" instead of a numeric value.' },
   'M-001': { type: 'Missing Data Notification', message: 'Patient did not complete that question of the questionnaire prior to the encounter and it is not required.' },
   'M-002': { type: 'Missing Data Notification', message: 'Data from the access data source (ex: EPIC/EHR) are not available.' },
+}
+
+export const applicationErrorMessages = {
+  idNotMappedToUrl: 'Message id is not mapped to http url in config.ts file at application root.',
+  httpGetUnknownError: 'Unknown error encountered while making http get request'
 }
 
 export const edssScoreChart = [{ score: '0.0', title: 'Normal neurological exam.' }

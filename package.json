@@ -74,7 +74,9 @@
   },
   "dependencies": {
     "@sutterhealth/analytics": "^1.1.10",
+    "@sutterhealth/data-services": "^1.4.25",
     "@sutterhealth/progress-notes": "^0.1.5",
+    "@sutterhealth/user-authentication": "^1.1.9",
     "moment": "^2.19.1"
   }
 }

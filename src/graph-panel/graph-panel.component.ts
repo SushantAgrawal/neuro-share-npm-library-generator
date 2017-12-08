@@ -5,7 +5,7 @@ import * as d3 from 'd3';
 import { ProgressNotesGeneratorService } from '@sutterhealth/progress-notes';
 import { BrokerService } from '../broker/broker.service';
 import { NeuroGraphService } from '../neuro-graph.service';
-import { allMessages, GRAPH_SETTINGS } from '../neuro-graph.config';
+import { allMessages, GRAPH_SETTINGS, errorMessages } from '../neuro-graph.config';
 import { SharedGridComponent } from '../graph-panel/shared-grid/shared-grid.component';
 import { RelapsesComponent } from '../graph-panel/relapses/relapses.component';
 import { ImagingComponent } from '../graph-panel/imaging/imaging.component';
@@ -57,6 +57,7 @@ export class GraphPanelComponent implements OnInit, OnDestroy {
   //#region Lifecycle events
   ngOnInit() {
     this.setDefaultState();
+
     let obsEdss = this.brokerService.filterOn(allMessages.neuroRelated).filter(t => (t.data.artifact == 'edss'));
     let sub0 = obsEdss.filter(t => t.data.checked).subscribe(d => {
       d.error
@@ -82,7 +83,19 @@ export class GraphPanelComponent implements OnInit, OnDestroy {
     let sub3 = this.brokerService.filterOn(this.brokerService.errorMessageId).subscribe(d => {
       this.showError(d.error);
     });
-    this.subscriptions = sub0.add(sub1).add(sub2).add(sub3);
+
+    let sub4 = this.brokerService.filterOn(allMessages.showCustomError).subscribe(d => {
+      var array = d.data.split(',');
+      var errMsg: Array<any> = [];
+      array.forEach(element => {
+        var msg = element + ' : ' + errorMessages[element].message;
+        errMsg.push(msg);
+      });
+
+      this.showError(errMsg);
+    });
+
+    this.subscriptions = sub0.add(sub1).add(sub2).add(sub3).add(sub4);
   }
 
   ngOnDestroy() {

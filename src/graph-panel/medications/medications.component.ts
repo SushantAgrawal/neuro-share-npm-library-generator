@@ -36,6 +36,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
   vitaminDArray: Array<any> = [];
   otherMedsArray: Array<any> = [];
   registerDrag: any;
+  queryParams: any;
   selectedMed = {
     dmt: false,
     otherMeds: false,
@@ -66,6 +67,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
 
   constructor(private brokerService: BrokerService, private dialog: MdDialog, private neuroGraphService: NeuroGraphService) {
     this.registerDrag = e => neuroGraphService.registerDrag(e);
+    this.queryParams = this.neuroGraphService.get("queryParams");
   }
 
   ngOnInit() {
@@ -78,12 +80,15 @@ export class MedicationsComponent implements OnInit, OnDestroy {
         : (() => {
           this.prepareMedications(d.data[0][allHttpMessages.httpGetMedications]);
           if (this.selectedMed[this.medType.dmt]) {
+            this.checkForError(this.dmtArray);
             this.drawDmt();
           }
           if (this.selectedMed[this.medType.vitaminD]) {
+            this.checkForError(this.vitaminDArray);
             this.drawVitaminD();
           }
           if (this.selectedMed[this.medType.otherMeds]) {
+            this.checkForError(this.otherMedsArray);
             this.drawOtherMeds();
           }
           let dmtResponse = d.data[1][allHttpMessages.httpGetDmt];
@@ -131,7 +136,63 @@ export class MedicationsComponent implements OnInit, OnDestroy {
         }
       })();
     })
-    this.subscriptions.add(subScaleUpdate);
+
+    let subDmtPost = this.brokerService.filterOn(allHttpMessages.httpPostDmt).subscribe(d => {
+      d.error ? console.log(d.error) : (() => {
+        let params =
+          this.dmtSecondLayerLocalData.push({
+            dmt_order_id: this.medSecondLayerModel.orderIdentifier.toString(),
+            patient_reported_start: `${this.medSecondLayerModel.patientReportedStartDateMonth}/${this.medSecondLayerModel.patientReportedStartDateYear}`,
+            reason_stopped: this.medSecondLayerModel.reasonStopped,
+            other_reason: this.medSecondLayerModel.otherReason,
+            last_updated_provider_id: this.queryParams.provider_id,
+            last_updated_instant: this.neuroGraphService.moment(new Date()).format('MM/DD/YYYY HH:mm:ss'),
+            save_csn: this.queryParams.csn,
+            save_csn_status: this.queryParams.csn_status
+          });
+        this.dialogRef.close();
+      })();
+    })
+
+    let subDmtPut = this.brokerService.filterOn(allHttpMessages.httpPutDmt).subscribe(d => {
+      d.error ? console.log(d.error) : (() => {
+        let med = d.carryBag.dmt;
+        med.patient_reported_start = `${this.medSecondLayerModel.patientReportedStartDateMonth}/${this.medSecondLayerModel.patientReportedStartDateYear}`;
+        med.reason_stopped = this.medSecondLayerModel.reasonStopped;
+        med.other_reason = this.medSecondLayerModel.otherReason;
+        med.otherReason = this.medSecondLayerModel.otherReason;
+        this.dialogRef.close();
+      })();
+    })
+
+    let subOtherMedsPost = this.brokerService.filterOn(allHttpMessages.httpPostOtherMeds).subscribe(d => {
+      d.error ? console.log(d.error) : (() => {
+        this.otherMedsSecondLayerLocalData.push({
+          other_med_order_id: this.medSecondLayerModel.orderIdentifier.toString(),
+          reason_for_med: this.medSecondLayerModel.reasonForMed,
+          last_updated_provider_id: this.queryParams.provider_id,
+          last_updated_instant: this.neuroGraphService.moment(new Date()).format('MM/DD/YYYY HH:mm:ss'),
+          save_csn: this.queryParams.csn,
+          save_csn_status: this.queryParams.csn_status
+        });
+        this.dialogRef.close();
+      })();
+    })
+
+    let subOtherMedsPut = this.brokerService.filterOn(allHttpMessages.httpPutOtherMeds).subscribe(d => {
+      d.error ? console.log(d.error) : (() => {
+        let med = d.carryBag.otherMed;
+        med.reason_for_med = this.medSecondLayerModel.reasonForMed;
+        this.dialogRef.close();
+      })();
+    })
+
+    this.subscriptions
+      .add(subScaleUpdate)
+      .add(subDmtPost)
+      .add(subDmtPut)
+      .add(subOtherMedsPost)
+      .add(subOtherMedsPut)
   }
 
   ngOnDestroy() {
@@ -161,10 +222,24 @@ export class MedicationsComponent implements OnInit, OnDestroy {
               value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.toDate).format('MM/DD/YYYY')
             }
           ];
+          let qParamsEhr: any = [
+            {
+              name: 'pom-id',
+              value: this.neuroGraphService.get('queryParams').pom_id
+            },
+            {
+              name: 'startDate',
+              value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.fromDate).format('MM/DD/YYYY')
+            },
+            {
+              name: 'endDate',
+              value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.toDate).format('MM/DD/YYYY')
+            }
+          ];
           this.brokerService.httpGetMany('MEDICATIONS_ALL_DATA', [
             {
               urlId: allHttpMessages.httpGetMedications,
-              queryParams: qParams
+              queryParams: qParamsEhr
             },
             {
               urlId: allHttpMessages.httpGetDmt,
@@ -218,27 +293,52 @@ export class MedicationsComponent implements OnInit, OnDestroy {
     let otherMedsIds = medication.otherMeds.ids;
     let mappedCodes = medication.otherMeds.mappedCodes;
 
+    let hasMatchedMappedCodes = (med) => {
+      let matched = [];
+      med.associatedDiagnoses.forEach(ad => {
+        ad.codeSets.forEach(cs => {
+          cs.mappedCode.forEach(mc => {
+            if (mappedCodes.find(c => c === mc))
+              matched.push(mc)
+          });
+        });
+      });
+      return matched.length > 0
+    }
+
     medicationOrders.forEach(x => {
-      if (x.medication && genericNames.find(gn => gn === x.medication.simple_generic_name.toLowerCase())) {
+      if (x.medication && genericNames.find(gn => gn === x.medication.simpleGenericName[0].toLowerCase())) {
         x.type = this.medType.dmt
-      } else if (x.medication && vitaminDIds.find(id => id === x.medication.id)) {
+      } else if (x.medication && vitaminDIds.find(id => id.toString() === x.medication.id)) {
         x.type = this.medType.vitaminD
-      } else if (x.medication && otherMedsIds.find(id => id === x.medication.id)) {
+      } else if (x.medication && otherMedsIds.find(id => id.toString() === x.medication.id)) {
         x.type = this.medType.otherMeds
-      } else if (searchObject(x, 'mapped_code', mappedCodes).length > 0) {
+        // } else if (searchObject(x, 'mappedCode', mappedCodes).length > 0) {
+        //   x.type = this.medType.otherMeds
+        // }
+      } else if (hasMatchedMappedCodes(x)) {
         x.type = this.medType.otherMeds
       }
     });
 
     this.dmtArray = medicationOrders
       .filter(x => x.type == this.medType.dmt)
-      .sort((a, b) => Date.parse(b.date.medStart) - Date.parse(a.date.medStart));
+      .sort((a, b) => Date.parse(b.date.orderDate) - Date.parse(a.date.orderDate));
     this.vitaminDArray = medicationOrders
       .filter(x => x.type == this.medType.vitaminD)
-      .sort((a, b) => Date.parse(b.date.medStart) - Date.parse(a.date.medStart));;
+      .sort((a, b) => Date.parse(b.date.orderDate) - Date.parse(a.date.orderDate));
     this.otherMedsArray = medicationOrders
       .filter(x => x.type == this.medType.otherMeds)
-      .sort((a, b) => Date.parse(b.date.medStart) - Date.parse(a.date.medStart));;
+      .sort((a, b) => Date.parse(b.date.orderDate) - Date.parse(a.date.orderDate));
+  }
+
+  checkForError(meds: Array<any>) {
+    if (meds.length == 0) {
+      this.brokerService.emit(allMessages.showCustomError, 'M-002');
+    }
+    else if (!meds.every(m => m.date.length != 0)) {
+      this.brokerService.emit(allMessages.showCustomError, 'D-001');
+    }
   }
 
   //Clean up needed
@@ -247,7 +347,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
       medicationId: data.medication.id,
       orderIdentifier: data.orderIdentifier,
       name: data.name,
-      simpleGenericName: data.medication.simple_generic_name,
+      simpleGenericName: data.medication.simpleGenericName,
       orderDate: data.date.orderDate,
       medEnd: data.date.medEnd,
       medQuantity: data.medQuantity,
@@ -298,72 +398,42 @@ export class MedicationsComponent implements OnInit, OnDestroy {
   }
 
   updateDmt() {
-    let dmt = this
-      .dmtSecondLayerLocalData
-      .find(x => x.dmt_order_id === this.medSecondLayerModel.orderIdentifier.toString());
-    if (dmt) {
-      dmt.patient_reported_start = `${this.medSecondLayerModel.patientReportedStartDateMonth}/${this.medSecondLayerModel.patientReportedStartDateYear}`;
-      dmt.reason_stopped = this.medSecondLayerModel.reasonStopped;
-      dmt.other_reason = this.medSecondLayerModel.otherReason;
-      dmt.otherReason = this.medSecondLayerModel.otherReason;
-    } else {
-      this
-        .dmtSecondLayerLocalData
-        .push({
-          dmt_order_id: this
-            .medSecondLayerModel
-            .orderIdentifier
-            .toString(),
-          patient_reported_start: `${this.medSecondLayerModel.patientReportedStartDateMonth}/${this.medSecondLayerModel.patientReportedStartDateYear}`,
-          reason_stopped: this.medSecondLayerModel.reasonStopped,
-          other_reason: this.medSecondLayerModel.otherReason,
-          last_updated_provider_id: "",
-          last_updated_instant: this.neuroGraphService.moment(new Date()).format('MM/DD/YYYY HH:mm:ss'),
-          save_csn: this
-            .neuroGraphService
-            .get("queryParams")
-            .csn,
-          save_csn_status: this
-            .neuroGraphService
-            .get("queryParams")
-            .encounter_status
-        });
+    let dmt = this.dmtSecondLayerLocalData.find(x => x.dmt_order_id === this.medSecondLayerModel.orderIdentifier.toString());
+    let payload = {
+      pom_id: this.queryParams.pom_id,
+      dmt_order_id: this.medSecondLayerModel.orderIdentifier.toString(),
+      patient_reported_start: `${this.medSecondLayerModel.patientReportedStartDateMonth}/${this.medSecondLayerModel.patientReportedStartDateYear}`,
+      reason_stopped: this.medSecondLayerModel.reasonStopped,
+      provider_id: this.queryParams.provider_id,
+      updated_instant: this.neuroGraphService.moment(new Date()).format('MM/DD/YYYY HH:mm:ss'),
+      save_csn: this.queryParams.csn,
+      save_csn_status: this.queryParams.csn_status
     }
-    this
-      .dialogRef
-      .close();
+    if (dmt) {
+      this.brokerService.httpPut(allHttpMessages.httpPutDmt, payload, { dmt });
+    } else {
+      this.brokerService.httpPost(allHttpMessages.httpPostDmt, payload);
+    }
   }
 
   updateOtherMeds() {
-    let othreMeds = this
+    let otherMed = this
       .otherMedsSecondLayerLocalData
       .find(x => x.other_med_order_id === this.medSecondLayerModel.orderIdentifier.toString());
-    if (othreMeds) {
-      othreMeds.reason_for_med = this.medSecondLayerModel.reasonForMed;
-    } else {
-      this
-        .otherMedsSecondLayerLocalData
-        .push({
-          other_med_order_id: this
-            .medSecondLayerModel
-            .orderIdentifier
-            .toString(),
-          reason_for_med: this.medSecondLayerModel.reasonForMed,
-          last_updated_provider_id: "",
-          last_updated_instant: this.neuroGraphService.moment(new Date()).format('MM/DD/YYYY HH:mm:ss'),
-          save_csn: this
-            .neuroGraphService
-            .get("queryParams")
-            .csn,
-          save_csn_status: this
-            .neuroGraphService
-            .get("queryParams")
-            .encounter_status
-        });
+    let payload = {
+      pom_id: this.queryParams.pom_id,
+      other_med_order_id: this.medSecondLayerModel.orderIdentifier.toString(),
+      reason_for_med: this.medSecondLayerModel.reasonForMed,
+      last_updated_provider_id: this.queryParams.provider_id,
+      last_updated_instant: this.neuroGraphService.moment(new Date()).format('MM/DD/YYYY HH:mm:ss'),
+      save_csn: this.queryParams.csn,
+      save_csn_status: this.queryParams.csn_status
     }
-    this
-      .dialogRef
-      .close();
+    if (otherMed) {
+      this.brokerService.httpPut(allHttpMessages.httpPutOtherMeds, payload, { otherMed });
+    } else {
+      this.brokerService.httpPut(allHttpMessages.httpPostOtherMeds, payload);
+    }
   }
 
   //#region Drawing
@@ -373,7 +443,9 @@ export class MedicationsComponent implements OnInit, OnDestroy {
     let openSecondLayer = (selectedData) => {
       let dmt = this.dmtSecondLayerLocalData.find(x => x.dmt_order_id === selectedData.orderIdentifier.toString());
       this.medSecondLayerModel = this.getSecondLayerModel(selectedData, this.medType.dmt, dmt);
+      this.dialog.openDialogs.pop();
       this.dialogRef = this.dialog.open(this.dmtSecondLevelTemplate, config);
+      this.dialogRef.updatePosition({ top: `${d3.event.clientY - 300}px`, left: `${d3.event.clientX - 200}px` });
     };
     this.drawChart(this.dmtArray, this.medType.dmt, GRAPH_SETTINGS.medications.dmtColor, GRAPH_SETTINGS.medications.dmtOverlapColor, openSecondLayer);
   }
@@ -383,6 +455,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
     let openSecondLayer = (selectedData) => {
       this.medSecondLayerModel = this.getSecondLayerModel(selectedData, this.medType.vitaminD, false);
       this.dialogRef = this.dialog.open(this.vitaminDSecondLevelTemplate, config);
+      this.dialogRef.updatePosition({ top: `${d3.event.clientY - 200}px`, left: `${d3.event.clientX - 150}px` });
     };
     this.drawChart(this.vitaminDArray, this.medType.vitaminD, GRAPH_SETTINGS.medications.vitaminDColor, GRAPH_SETTINGS.medications.vitaminDOverlapColor, openSecondLayer);
   }
@@ -393,6 +466,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
       let otherMeds = this.otherMedsSecondLayerLocalData.find(x => x.other_med_order_id === selectedData.orderIdentifier.toString());
       this.medSecondLayerModel = this.getSecondLayerModel(selectedData, this.medType.otherMeds, otherMeds);
       this.dialogRef = this.dialog.open(this.otherMedsSecondLevelTemplate, config);
+      this.dialogRef.updatePosition({ top: `${d3.event.clientY - 250}px`, left: `${d3.event.clientX - 200}px` });
     };
     this.drawChart(this.otherMedsArray, this.medType.otherMeds, GRAPH_SETTINGS.medications.otherMedsColor, GRAPH_SETTINGS.medications.otherMedsOverlapColor, openSecondLayer);
   }
@@ -510,7 +584,6 @@ export class MedicationsComponent implements OnInit, OnDestroy {
         let width2 = parseFloat(next.getAttribute("width"));
         if (current !== next) {
           if (x1 > x2 && (x2 + width2) > x1 && y1 == y2) {
-            //debugger;
             let x = x1;
             let y = y1;
             let width = Math.abs(width2 - Math.abs(x2 - x1));
@@ -525,9 +598,9 @@ export class MedicationsComponent implements OnInit, OnDestroy {
               .attr('stroke', 'none')
               .attr('fill', overlapColor)
               .style('cursor', 'pointer')
-              .on("click", d => {
-                onClickCallback(d);
-              })
+            // .on("click", d => {
+            //   onClickCallback(d);
+            // })
           }
           else if (x1 > x2 && (x2 + width2) == x1 && y1 == y2) {
             let x = x1;
@@ -544,9 +617,9 @@ export class MedicationsComponent implements OnInit, OnDestroy {
               .attr('stroke', 'none')
               .attr('fill', overlapColor)
               .style('cursor', 'pointer')
-              .on("click", d => {
-                onClickCallback(d);
-              })
+            // .on("click", d => {
+            //   onClickCallback(d);
+            // })
           }
         }
 
@@ -575,7 +648,11 @@ export class MedicationsComponent implements OnInit, OnDestroy {
       .attr('text-anchor', 'start')
       .attr('text-height', 40)
       .attr('fill', 'black')
-      .style('text-transform', 'capitalize');
+      .style('text-transform', 'capitalize')
+      .style('cursor', 'pointer')
+      .on("click", d => {
+        onClickCallback(d);
+      });
     this.arrangeLabels(labels);
 
     //Adjusts height

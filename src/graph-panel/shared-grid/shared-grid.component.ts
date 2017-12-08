@@ -17,7 +17,7 @@ export class SharedGridComponent implements OnInit, OnDestroy {
   dialogRef: any;
   lastOfficeDateLabel: string;
   encounterData: any;
-  progressNotes:Array<any>;
+  progressNotes: Array<any>;
   constructor(private brokerService: BrokerService, private neuroGraphService: NeuroGraphService, public dialog: MdDialog) {
   }
 
@@ -31,7 +31,7 @@ export class SharedGridComponent implements OnInit, OnDestroy {
     })
     let sub1 = this
       .brokerService
-      .filterOn(allHttpMessages.httpGetReferenceLine)
+      .filterOn(allHttpMessages.httpGetEncounters)
       .subscribe(d => {
         d.error
           ? (() => {
@@ -51,8 +51,7 @@ export class SharedGridComponent implements OnInit, OnDestroy {
             let sharedGridElement = d3.select('#shared-grid');
             let sharedGrid = this.setupSharedGrid(sharedGridElement, this.chartState.canvasDimension);
 
-            if (this.encounterData.length > 0)
-            {
+            if (this.encounterData.length > 0) {
               this.drawReferenceLines(sharedGrid, this.chartState.canvasDimension, this.chartState.xScale);
               let prevCSN = "0";
               if (this.encounterData.length > 1) {
@@ -60,22 +59,18 @@ export class SharedGridComponent implements OnInit, OnDestroy {
               }
               this.getProgessNoteData(prevCSN);
             }
-             
-              
+
+
           })();
       })
     let sub2 = this
       .brokerService
-      .filterOn(allHttpMessages.httpGeProgressNote)
+      .filterOn(allHttpMessages.httpGetProgressNote)
       .subscribe(d => {
-        d.error
-          ? (() => {
-            console.log(d.error)
-          })
-          : (() => {
-            //debugger;
-            this.progressNotes = d.data["staged_objects"];
-          })();
+        d.error ? (() => { console.log(d.error) }) : (() => {
+          //this.progressNotes = d.data["staged_objects"];
+          d.data && d.data.EPIC && (this.progressNotes = d.data.EPIC.notes);
+        })();
       })
     this.subscriptions.add(sub1).add(sub2);
   };
@@ -88,9 +83,9 @@ export class SharedGridComponent implements OnInit, OnDestroy {
   //#region Graph Drawing
 
   getReferenceLineData() {
-    this.brokerService.httpGet(allHttpMessages.httpGetReferenceLine, [
+    this.brokerService.httpGet(allHttpMessages.httpGetEncounters, [
       {
-        name: 'pom_id',
+        name: 'pom-id',
         value: this.neuroGraphService.get('queryParams').pom_id
       },
       {
@@ -104,12 +99,11 @@ export class SharedGridComponent implements OnInit, OnDestroy {
     ]);
   }
   getProgessNoteData(prevCSN) {
-    this.brokerService.httpGet(allHttpMessages.httpGeProgressNote, [
+    this.brokerService.httpGet(allHttpMessages.httpGetProgressNote, [
       {
         name: 'pom_id',
         value: this.neuroGraphService.get('queryParams').pom_id
       },
-
       {
         name: 'csn',
         value: prevCSN
@@ -224,7 +218,8 @@ export class SharedGridComponent implements OnInit, OnDestroy {
         .attr("y", "20")
         .attr("width", lastOfficewidth)
         .attr("height", lastOfficeheight)
-        .attr("fill", "#EBEBEB");
+        .attr("fill", "#EBEBEB")
+        .attr('stroke', '#BCBCBC');
       let axisTextPrev = nodeSelection.append('text')
         .attr('y', 35)
         .style('font-size', '12px')
@@ -244,7 +239,8 @@ export class SharedGridComponent implements OnInit, OnDestroy {
         .attr("y", "20")
         .attr("width", lastOfficewidth)
         .attr("height", lastOfficeheight)
-        .attr("fill", "#EBEBEB");
+        .attr("fill", "#EBEBEB")
+        .attr('stroke', '#BCBCBC');
       let axisTextPrev = nodeSelection.append('text')
         .attr('y', 35)
         .style('font-size', '12px')
@@ -279,7 +275,8 @@ export class SharedGridComponent implements OnInit, OnDestroy {
         .attr("y", "20")
         .attr("width", width)
         .attr("height", height)
-        .attr("fill", "#EBEBEB");
+        .attr("fill", "#EBEBEB")
+        .attr('stroke', '#BCBCBC');
       let axisText = nodeSelection.append('text')
         .attr('y', 35)
         .style('font-size', '12px')
@@ -295,7 +292,8 @@ export class SharedGridComponent implements OnInit, OnDestroy {
         .attr("y", "20")
         .attr("width", width)
         .attr("height", height)
-        .attr("fill", "#EBEBEB");
+        .attr("fill", "#EBEBEB")
+        .attr('stroke', '#BCBCBC');
       let axisText = nodeSelection.append('text')
         .attr('y', 35)
         .style('font-size', '12px')
