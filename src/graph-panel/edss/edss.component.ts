@@ -12,7 +12,7 @@ import { MatDialog, MatDialogRef } from '@angular/material';
 import * as d3 from 'd3';
 import { BrokerService } from '../../broker/broker.service';
 import { NeuroGraphService } from '../../neuro-graph.service';
-import { allMessages, allHttpMessages, medication, GRAPH_SETTINGS, edssScoreChart } from '../../neuro-graph.config';
+import { allMessages, allHttpMessages, applicationErrorMessages, medication, GRAPH_SETTINGS, edssScoreChart } from '../../neuro-graph.config';
 
 @Component({ selector: '[app-edss]', templateUrl: './edss.component.html', styleUrls: ['./edss.component.scss'], encapsulation: ViewEncapsulation.None })
 
@@ -172,12 +172,12 @@ export class EdssComponent implements OnInit, OnDestroy {
                     value: this.neuroGraphService.get('queryParams').pom_id
                   },
                   {
-                    name: 'startDate',
-                    value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.fromDate).format('MM/DD/YYYY')
+                    name: 'start_year',
+                    value: this.chartState.dataBufferPeriod.fromDate.getFullYear()
                   },
                   {
-                    name: 'endDate',
-                    value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.toDate).format('MM/DD/YYYY')
+                    name: 'end_year',
+                    value: this.chartState.dataBufferPeriod.toDate.getFullYear()
                   }
                 ]);
             } else {
@@ -199,75 +199,80 @@ export class EdssComponent implements OnInit, OnDestroy {
             this.brokerService.emit(allMessages.checkboxEnable, 'edss');
           })()
           : (() => {
-            let edssData = d.data[0][allHttpMessages.httpGetEdss].edss_scores;
-            let quesData = d.data[1][allHttpMessages.httpGetAllQuestionnaire].questionaires;
-            //Use moment js later
-            let getParsedDate = (dtString) => {
-              let dtPart = dtString.split(' ')[0];
-              return Date.parse(dtPart);
-            }
-            if (edssData) {
-              this.clinicianDataSet = edssData.map(d => {
-                return {
-                  ...d,
-                  lastUpdatedDate: getParsedDate(d.last_updated_instant),
-                  reportedBy: "Clinician",
-                  scoreValue: parseFloat(d.score)
-                }
-              }).sort((a, b) => a.lastUpdatedDate - b.lastUpdatedDate);
-            }
-            if (quesData) {
-              this.patientDataSet = quesData.map(d => {
-                return {
-                  ...d,
-                  lastUpdatedDate: getParsedDate(d.qx_completed_at),
-                  reportedBy: "Patient",
-                  scoreValue: parseFloat(d.edss_score)
-                }
-              }).sort((a, b) => a.lastUpdatedDate - b.lastUpdatedDate);
-            }
-
-            if (this.clinicianDataSet && this.patientDataSet) {
-              this.drawEdssYAxis();
-              this.drawEdssLineCharts();
-            }
-
-            this.edssChartLoaded = true;
-            if (this.edssOpenAddPopUp == true) {
-              this.edssOpenAddPopUp = false;
-              let dt = d3.selectAll('.edss-charts');
-              if (dt["_groups"][0].length > 0) {
-                this.scoreChartOpType = "Add";
-                let dialogConfig = {
-                  hasBackdrop: true,
-                  panelClass: 'ns-edss-theme',
-                  width: '670px',
-                  height: '675px'
-                };
-                this.scoreChartDialogRef = this
-                  .dialog
-                  .open(this.edssScoreChartTemplate, dialogConfig);
-                this
-                  .scoreChartDialogRef
-                  .updatePosition({ top: '65px', left: '60px' });
+            try {
+              let edssData = d.data[0][allHttpMessages.httpGetEdss].edss_scores;
+              let quesData = d.data[1][allHttpMessages.httpGetAllQuestionnaire].questionaires;
+              let getParsedDate = (dtString) => {
+                let dtPart = dtString.split(' ')[0];
+                return Date.parse(dtPart);
               }
-            }
-            this.brokerService.emit(allMessages.checkboxEnable, 'edss');
+              if (edssData) {
+                this.clinicianDataSet = edssData.map(d => {
+                  return {
+                    ...d,
+                    lastUpdatedDate: getParsedDate(d.last_updated_instant),
+                    reportedBy: "Clinician",
+                    scoreValue: parseFloat(d.score)
+                  }
+                }).sort((a, b) => a.lastUpdatedDate - b.lastUpdatedDate);
+              }
+              if (quesData) {
+                this.patientDataSet = quesData.map(d => {
+                  return {
+                    ...d,
+                    lastUpdatedDate: getParsedDate(d.qx_completed_at),
+                    reportedBy: "Patient",
+                    scoreValue: parseFloat(d.edss_score)
+                  }
+                }).sort((a, b) => a.lastUpdatedDate - b.lastUpdatedDate);
+              }
 
-            //custom error handling
-            var ErrorCode: string = '';
-            if (!edssData || edssData.length == 0)
-              ErrorCode = ErrorCode.indexOf('M-002') != -1 ? ErrorCode : ErrorCode == '' ? 'M-002' : ErrorCode + ',' + 'M-002';
-            if (!quesData || quesData.length == 0)
-              ErrorCode = ErrorCode.indexOf('M-001') != -1 ? ErrorCode : ErrorCode == '' ? 'M-001' : ErrorCode + ',' + 'M-001';
-            if (!quesData || quesData.some(m => m.status.toUpperCase() != "COMPLETED"))
-              ErrorCode = ErrorCode.indexOf('U-004') != -1 ? ErrorCode : ErrorCode == '' ? 'U-004' : ErrorCode + ',' + 'U-004';
-            if (!quesData || quesData.some(m => m.edss_score == 'No result' || m.edss_score == ''))
-              ErrorCode = ErrorCode.indexOf('D-002') != -1 ? ErrorCode : ErrorCode == '' ? 'D-002' : ErrorCode + ',' + 'D-002';
-            if (!edssData || edssData.some(m => m.score == 'No result' || m.score == ''))
-              ErrorCode = ErrorCode.indexOf('D-002') != -1 ? ErrorCode : ErrorCode == '' ? 'D-002' : ErrorCode + ',' + 'D-002';
-            if (ErrorCode != '')
-              this.brokerService.emit(allMessages.showCustomError, ErrorCode);
+              if (this.clinicianDataSet && this.patientDataSet) {
+                this.drawEdssYAxis();
+                this.drawEdssLineCharts();
+              }
+
+              this.edssChartLoaded = true;
+              if (this.edssOpenAddPopUp == true) {
+                this.edssOpenAddPopUp = false;
+                let dt = d3.selectAll('.edss-charts');
+                if (dt["_groups"][0].length > 0) {
+                  this.scoreChartOpType = "Add";
+                  let dialogConfig = {
+                    hasBackdrop: true,
+                    panelClass: 'ns-edss-theme',
+                    width: '670px',
+                    height: '675px'
+                  };
+                  this.scoreChartDialogRef = this
+                    .dialog
+                    .open(this.edssScoreChartTemplate, dialogConfig);
+                  this
+                    .scoreChartDialogRef
+                    .updatePosition({ top: '65px', left: '60px' });
+                }
+              }
+              this.brokerService.emit(allMessages.checkboxEnable, 'edss');
+
+              //custom error handling
+              var ErrorCode: string = '';
+              if (!edssData || edssData.length == 0)
+                ErrorCode = ErrorCode.indexOf('M-002') != -1 ? ErrorCode : ErrorCode == '' ? 'M-002' : ErrorCode + ',' + 'M-002';
+              if (!quesData || quesData.length == 0)
+                ErrorCode = ErrorCode.indexOf('M-001') != -1 ? ErrorCode : ErrorCode == '' ? 'M-001' : ErrorCode + ',' + 'M-001';
+              if (!quesData || quesData.some(m => m.status.toUpperCase() != "COMPLETED"))
+                ErrorCode = ErrorCode.indexOf('U-004') != -1 ? ErrorCode : ErrorCode == '' ? 'U-004' : ErrorCode + ',' + 'U-004';
+              if (!quesData || quesData.some(m => m.edss_score == 'No result' || m.edss_score == ''))
+                ErrorCode = ErrorCode.indexOf('D-002') != -1 ? ErrorCode : ErrorCode == '' ? 'D-002' : ErrorCode + ',' + 'D-002';
+              if (!edssData || edssData.some(m => m.score == 'No result' || m.score == ''))
+                ErrorCode = ErrorCode.indexOf('D-002') != -1 ? ErrorCode : ErrorCode == '' ? 'D-002' : ErrorCode + ',' + 'D-002';
+              if (ErrorCode != '')
+                this.brokerService.emit(allMessages.showCustomError, ErrorCode);
+            }
+            catch (ex) {
+              console.log(ex);
+              this.brokerService.emit(allMessages.showLogicalError, 'EDSS');
+            }
           })();
       });
 
@@ -279,23 +284,28 @@ export class EdssComponent implements OnInit, OnDestroy {
         d.error
           ? console.log(d.error)
           : (() => {
-            if (d.data && d.data[0] && d.data[0].edss) {
-              this.edssVirtualLoadData = d.data[0].edss;
-              this.edssVirtualLoadDataLength = d.data[0].edss.q1.length;
-              this.edssVirtualLoadDataq1 = d.data[0].edss.q1;
-              this.edssVirtualLoadDataq2 = d.data[0].edss.q2;
-              this.edssVirtualLoadDataq3 = d.data[0].edss.q3;
-              this.edssVirtualLoadDataq4 = d.data[0].edss.q4;
-              this.edssVirtualLoadDatam = d.data[0].edss.m;
-              this.removeChart();
-              this.drawVirtualCaseload();
-              this.drawEdssLineCharts();
-              this.virtualCaseloadLoaded = true;
+            try {
+              if (d.data && d.data[0] && d.data[0].edss) {
+                this.edssVirtualLoadData = d.data[0].edss;
+                this.edssVirtualLoadDataLength = d.data[0].edss.q1.length;
+                this.edssVirtualLoadDataq1 = d.data[0].edss.q1;
+                this.edssVirtualLoadDataq2 = d.data[0].edss.q2;
+                this.edssVirtualLoadDataq3 = d.data[0].edss.q3;
+                this.edssVirtualLoadDataq4 = d.data[0].edss.q4;
+                this.edssVirtualLoadDatam = d.data[0].edss.m;
+                this.removeChart();
+                this.drawVirtualCaseload();
+                this.drawEdssLineCharts();
+                this.virtualCaseloadLoaded = true;
+              }
+              else {
+                this.brokerService.emit(allMessages.showCustomError, 'M-002');
+              }
             }
-            else {
-              this.brokerService.emit(allMessages.showCustomError, 'M-002');
+            catch (ex) {
+              console.log(ex);
+              this.brokerService.emit(allMessages.showLogicalError, 'population');
             }
-
           })();
       });
 
@@ -324,21 +334,28 @@ export class EdssComponent implements OnInit, OnDestroy {
       .filterOn(allHttpMessages.httpPostEdss)
       .subscribe(d => {
         d.error ? console.log(d.error) : (() => {
-          let currentDate = new Date();
-          let selectedScore = d.carryBag.selectedScore;
-          this.clinicianDataSet.push({
-            last_updated_instant: `${currentDate.getFullYear()}-${currentDate.getMonth() + 1}-${currentDate.getDate()}`,
-            last_updated_provider_id: this.neuroGraphService.get("queryParams").provider_id,
-            save_csn: this.neuroGraphService.get("queryParams").csn,
-            save_csn_status: this.neuroGraphService.get("queryParams").csn_status,
-            score: selectedScore.score,
-            lastUpdatedDate: currentDate.getTime(),
-            reportedBy: "Clinician",
-            scoreValue: parseFloat(selectedScore.score)
-          })
-          this.removeChart();
-          this.drawEdssLineCharts();
-          this.scoreChartDialogRef.close();
+          try {
+            let currentDate = new Date();
+            let selectedScore = d.carryBag.selectedScore;
+            this.clinicianDataSet.push({
+              score_id: d.data.score_id,
+              last_updated_instant: `${currentDate.getFullYear()}-${currentDate.getMonth() + 1}-${currentDate.getDate()}`,
+              last_updated_provider_id: this.neuroGraphService.get("queryParams").provider_id,
+              save_csn: this.neuroGraphService.get("queryParams").csn,
+              save_csn_status: this.neuroGraphService.get("queryParams").csn_status,
+              score: selectedScore.score,
+              lastUpdatedDate: currentDate.getTime(),
+              reportedBy: "Clinician",
+              scoreValue: parseFloat(selectedScore.score)
+            })
+            this.removeChart();
+            this.drawEdssLineCharts();
+            this.scoreChartDialogRef.close();
+          }
+          catch (ex) {
+            console.log(ex);
+            this.brokerService.emit(allMessages.showLogicalError, 'EDSS');
+          }
         })();
       });
 
@@ -348,12 +365,18 @@ export class EdssComponent implements OnInit, OnDestroy {
       .filterOn(allHttpMessages.httpPutEdss)
       .subscribe(d => {
         d.error ? console.log(d.error) : (() => {
-          let selectedScore = d.carryBag.selectedScore;
-          selectedScore.score = this.edssScoreDetail.score;
-          selectedScore.scoreValue = this.edssScoreDetail.scoreValue;
-          this.removeChart();
-          this.drawEdssLineCharts();
-          this.secondLayerDialogRef.close();
+          try {
+            let selectedScore = d.carryBag.selectedScore;
+            selectedScore.score = this.edssScoreDetail.score;
+            selectedScore.scoreValue = this.edssScoreDetail.scoreValue;
+            this.removeChart();
+            this.drawEdssLineCharts();
+            this.secondLayerDialogRef.close();
+          }
+          catch (ex) {
+            console.log(ex);
+            this.brokerService.emit(allMessages.showLogicalError, 'EDSS');
+          }
         })();
       });
 
@@ -387,7 +410,6 @@ export class EdssComponent implements OnInit, OnDestroy {
   getPayload(score) {
     let currentDate = new Date();
     let payload = {
-      score_id: "1",
       pom_id: this.neuroGraphService.get('queryParams').pom_id.toString(),
       score: score.toString(),
       provider_id: this.neuroGraphService.get("queryParams").provider_id,
@@ -447,8 +469,9 @@ export class EdssComponent implements OnInit, OnDestroy {
   onUpdateSecondLayer() {
     let match = this.clinicianDataSet.find(x => x.save_csn == this.edssScoreDetail.save_csn);
     if (match) {
-      let payload = this.getPayload(this.edssScoreDetail.score);
-      this.brokerService.httpPut(allHttpMessages.httpPutEdss, this.getPayload(this.edssScoreDetail.score), { selectedScore: match });
+      let payload: any = this.getPayload(this.edssScoreDetail.score);
+      payload.score_id = this.edssScoreDetail.score_id;
+      this.brokerService.httpPut(allHttpMessages.httpPutEdss, payload, { selectedScore: match });
     }
   }
 

@@ -5,7 +5,7 @@ import * as d3 from 'd3';
 import { ProgressNotesGeneratorService } from '@sutterhealth/progress-notes';
 import { BrokerService } from '../broker/broker.service';
 import { NeuroGraphService } from '../neuro-graph.service';
-import { allMessages, GRAPH_SETTINGS, errorMessages } from '../neuro-graph.config';
+import { allMessages, applicationErrorMessages, GRAPH_SETTINGS, errorMessages } from '../neuro-graph.config';
 import { SharedGridComponent } from '../graph-panel/shared-grid/shared-grid.component';
 import { RelapsesComponent } from '../graph-panel/relapses/relapses.component';
 import { ImagingComponent } from '../graph-panel/imaging/imaging.component';
@@ -88,14 +88,20 @@ export class GraphPanelComponent implements OnInit, OnDestroy {
       var array = d.data.split(',');
       var errMsg: Array<any> = [];
       array.forEach(element => {
-        var msg = element + ' : ' + errorMessages[element].message;
+        var msg =  '  ' + element + ' : ' + errorMessages[element].message + '  ';
         errMsg.push(msg);
       });
-
       this.showError(errMsg);
     });
 
-    this.subscriptions = sub0.add(sub1).add(sub2).add(sub3).add(sub4);
+    let sub5 = this.brokerService.filterOn(allMessages.showLogicalError).subscribe(d => {
+      setTimeout(() => {
+        let msg = applicationErrorMessages.logicalError.replace('{{component}}', d.data);
+        this.showError(msg);
+      }, 3000);
+    });
+
+    this.subscriptions = sub0.add(sub1).add(sub2).add(sub3).add(sub4).add(sub5);
   }
 
   ngOnDestroy() {
@@ -287,7 +293,7 @@ export class GraphPanelComponent implements OnInit, OnDestroy {
   //#region Error
   showError(err) {
     this.snackBar.open(err, "Dismiss", {
-      duration: 5000,
+      duration: 10000,
       extraClasses: ['neuro-error-snackbar']
     });
   }

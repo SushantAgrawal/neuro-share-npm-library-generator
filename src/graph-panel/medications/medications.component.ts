@@ -78,32 +78,35 @@ export class MedicationsComponent implements OnInit, OnDestroy {
           this.brokerService.emit(allMessages.checkboxEnable, 'dmt');
         })()
         : (() => {
-          this.prepareMedications(d.data[0][allHttpMessages.httpGetMedications]);
-
-          let dmtResponse = d.data[1][allHttpMessages.httpGetDmt];
-          let otherMedsResponse = d.data[2][allHttpMessages.httpGetOtherMeds];
-          let relapsesLocalData = d.data[3][allHttpMessages.httpGetRelapse];
-          this.dmtSecondLayerLocalData = dmtResponse.DMTs || [];
-          this.otherMedsSecondLayerLocalData = otherMedsResponse.Other_Meds || [];
-          this.relapsesLocalData = relapsesLocalData.relapses || [];
-
-          if (this.selectedMed[this.medType.dmt]) {
-            this.checkForError(this.dmtArray);
-            if (!this.relapsesLocalData || this.relapsesLocalData.length == 0) {
-              this.brokerService.emit(allMessages.showCustomError, 'M-002');
+          try {
+            this.prepareMedications(d.data[0][allHttpMessages.httpGetMedications]);
+            let dmtResponse = d.data[1][allHttpMessages.httpGetDmt];
+            let otherMedsResponse = d.data[2][allHttpMessages.httpGetOtherMeds];
+            let relapsesLocalData = d.data[3][allHttpMessages.httpGetRelapse];
+            this.dmtSecondLayerLocalData = dmtResponse.DMTs || [];
+            this.otherMedsSecondLayerLocalData = otherMedsResponse.Other_Meds || [];
+            this.relapsesLocalData = relapsesLocalData.relapses || [];
+            if (this.selectedMed[this.medType.dmt]) {
+              this.checkForError(this.dmtArray);
+              if (!this.relapsesLocalData || this.relapsesLocalData.length == 0) {
+                this.brokerService.emit(allMessages.showCustomError, 'M-002');
+              }
+              this.drawDmt();
             }
-            this.drawDmt();
+            if (this.selectedMed[this.medType.vitaminD]) {
+              this.checkForError(this.vitaminDArray);
+              this.drawVitaminD();
+            }
+            if (this.selectedMed[this.medType.otherMeds]) {
+              this.checkForError(this.otherMedsArray);
+              this.drawOtherMeds();
+            }
+            this.brokerService.emit(allMessages.checkboxEnable, 'dmt');
           }
-          if (this.selectedMed[this.medType.vitaminD]) {
-            this.checkForError(this.vitaminDArray);
-            this.drawVitaminD();
+          catch (e) {
+            console.log(e);
+            this.brokerService.emit(allMessages.showLogicalError, 'Medication');
           }
-          if (this.selectedMed[this.medType.otherMeds]) {
-            this.checkForError(this.otherMedsArray);
-            this.drawOtherMeds();
-          }
-
-          this.brokerService.emit(allMessages.checkboxEnable, 'dmt');
         })();
     });
     let neuroRelated = this.brokerService.filterOn(allMessages.neuroRelated);
@@ -145,7 +148,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
 
     let subDmtPost = this.brokerService.filterOn(allHttpMessages.httpPostDmt).subscribe(d => {
       d.error ? console.log(d.error) : (() => {
-        let params =
+        try {
           this.dmtSecondLayerLocalData.push({
             dmt_order_id: this.medSecondLayerModel.orderIdentifier.toString(),
             patient_reported_start: `${this.medSecondLayerModel.patientReportedStartDateMonth}/${this.medSecondLayerModel.patientReportedStartDateYear}`,
@@ -156,40 +159,59 @@ export class MedicationsComponent implements OnInit, OnDestroy {
             save_csn: this.queryParams.csn,
             save_csn_status: this.queryParams.csn_status
           });
-        this.dialogRef.close();
+          this.dialogRef.close();
+        } catch (ex) {
+          console.log(ex);
+          this.brokerService.emit(allMessages.showLogicalError, 'Medication');
+        }
       })();
     })
 
     let subDmtPut = this.brokerService.filterOn(allHttpMessages.httpPutDmt).subscribe(d => {
       d.error ? console.log(d.error) : (() => {
-        let med = d.carryBag.dmt;
-        med.patient_reported_start = `${this.medSecondLayerModel.patientReportedStartDateMonth}/${this.medSecondLayerModel.patientReportedStartDateYear}`;
-        med.reason_stopped = this.medSecondLayerModel.reasonStopped;
-        med.other_reason = this.medSecondLayerModel.otherReason;
-        med.otherReason = this.medSecondLayerModel.otherReason;
-        this.dialogRef.close();
+        try {
+          let med = d.carryBag.dmt;
+          med.patient_reported_start = `${this.medSecondLayerModel.patientReportedStartDateMonth}/${this.medSecondLayerModel.patientReportedStartDateYear}`;
+          med.reason_stopped = this.medSecondLayerModel.reasonStopped;
+          med.other_reason = this.medSecondLayerModel.otherReason;
+          med.otherReason = this.medSecondLayerModel.otherReason;
+          this.dialogRef.close();
+        } catch (ex) {
+          console.log(ex);
+          this.brokerService.emit(allMessages.showLogicalError, 'Medication');
+        }
       })();
     })
 
     let subOtherMedsPost = this.brokerService.filterOn(allHttpMessages.httpPostOtherMeds).subscribe(d => {
       d.error ? console.log(d.error) : (() => {
-        this.otherMedsSecondLayerLocalData.push({
-          other_med_order_id: this.medSecondLayerModel.orderIdentifier.toString(),
-          reason_for_med: this.medSecondLayerModel.reasonForMed,
-          last_updated_provider_id: this.queryParams.provider_id,
-          last_updated_instant: this.neuroGraphService.moment(new Date()).format('MM/DD/YYYY HH:mm:ss'),
-          save_csn: this.queryParams.csn,
-          save_csn_status: this.queryParams.csn_status
-        });
-        this.dialogRef.close();
+        try {
+          this.otherMedsSecondLayerLocalData.push({
+            other_med_order_id: this.medSecondLayerModel.orderIdentifier.toString(),
+            reason_for_med: this.medSecondLayerModel.reasonForMed,
+            last_updated_provider_id: this.queryParams.provider_id,
+            last_updated_instant: this.neuroGraphService.moment(new Date()).format('MM/DD/YYYY HH:mm:ss'),
+            save_csn: this.queryParams.csn,
+            save_csn_status: this.queryParams.csn_status
+          });
+          this.dialogRef.close();
+        } catch (ex) {
+          console.log(ex);
+          this.brokerService.emit(allMessages.showLogicalError, 'Medication');
+        }
       })();
     })
 
     let subOtherMedsPut = this.brokerService.filterOn(allHttpMessages.httpPutOtherMeds).subscribe(d => {
       d.error ? console.log(d.error) : (() => {
-        let med = d.carryBag.otherMed;
-        med.reason_for_med = this.medSecondLayerModel.reasonForMed;
-        this.dialogRef.close();
+        try {
+          let med = d.carryBag.otherMed;
+          med.reason_for_med = this.medSecondLayerModel.reasonForMed;
+          this.dialogRef.close();
+        } catch (ex) {
+          console.log(ex);
+          this.brokerService.emit(allMessages.showLogicalError, 'treatments');
+        }
       })();
     })
 
@@ -289,12 +311,7 @@ export class MedicationsComponent implements OnInit, OnDestroy {
   prepareMedications(data) {
     let medicationOrders: Array<any> = [];
     data && data.EPIC && data.EPIC.patients && (data.EPIC.patients.length > 0) && (medicationOrders = data.EPIC.patients[0].medicationOrders);
-    let genericNames = medication
-      .dmt
-      .genericNames
-      .toString()
-      .toLowerCase()
-      .split(',');
+    let genericNames = medication.dmt.genericNames.toString().toLowerCase().split(',');
     let vitaminDIds = medication.vitaminD.ids;
     let otherMedsIds = medication.otherMeds.ids;
     let mappedCodes = medication.otherMeds.mappedCodes;
@@ -313,15 +330,14 @@ export class MedicationsComponent implements OnInit, OnDestroy {
     }
 
     medicationOrders.forEach(x => {
-      if (x.medication && genericNames.find(gn => gn === x.medication.simpleGenericName[0].toLowerCase())) {
+      if (x.medication && genericNames.find(gn => {
+        return x.medication.simpleGenericName && x.medication.simpleGenericName[0] && gn === x.medication.simpleGenericName[0].toLowerCase();
+      })) {
         x.type = this.medType.dmt
       } else if (x.medication && vitaminDIds.find(id => id.toString() === x.medication.id)) {
         x.type = this.medType.vitaminD
       } else if (x.medication && otherMedsIds.find(id => id.toString() === x.medication.id)) {
         x.type = this.medType.otherMeds
-        // } else if (searchObject(x, 'mappedCode', mappedCodes).length > 0) {
-        //   x.type = this.medType.otherMeds
-        // }
       } else if (hasMatchedMappedCodes(x)) {
         x.type = this.medType.otherMeds
       }
@@ -498,22 +514,19 @@ export class MedicationsComponent implements OnInit, OnDestroy {
   }
 
   getShortenedName(input) {
-    let parts = input && input.split(' ');
-    let capitalize = parts[0]
-      .toLowerCase()
-      .replace(/\b(\w)/g, s => s.toUpperCase())
+    if (!input)
+      return '';
+    let parts = input.split(' ');
+    let capitalize = parts[0].toLowerCase().replace(/\b(\w)/g, s => s.toUpperCase())
     return capitalize + ' ...';
   }
 
   drawChart(allData: Array<any>, containterId, barColor, overlapColor, onClickCallback) {
     let dataset = allData.filter(d => {
-      //let dt = new Date(Date.parse(d.date.medStart || d.date.orderDate));
-      //return dt >= this.chartState.xDomain.currentMinValue && dt <= this.chartState.xDomain.currentMaxValue;
       let endDt = d.date.medEnd ? new Date(Date.parse(d.date.medEnd)) : this.chartState.xDomain.scaleMaxValue;
       return endDt >= this.chartState.xDomain.currentMinValue;
     });
 
-    //temporary fix to avoid overwrite
     d3.selectAll('#' + containterId).selectAll("*").remove();
 
     let svg = d3
