@@ -53,7 +53,6 @@ export class SymptomsComponent implements OnInit {
           })()
           : (() => {
             try {
-              //this.questionaireData = d.data.questionaires.sort((a:any, b:any) => new Date(a["qx_completed_at"]) - b["qx_completed_at"]);
               d.data && (this.questionaireData = d.data.questionaires || []);
 
               if (this.questionaireData && this.questionaireData.length > 0) {
@@ -238,7 +237,7 @@ export class SymptomsComponent implements OnInit {
                   }
                   this.questionaireSymptomData.push({
                     questionnaireDate: this.neuroGraphService.moment(element["qx_completed_at"]).format("MM/DD/YYYY"),
-                    status: (element.status.charAt(0).toUpperCase() + element.status.substr(1).toLowerCase()),
+                    status: (((element.status) ?element.status.charAt(0).toUpperCase():"") + ((element.status ) ?element.status.substr(1).toLowerCase():"")),
                     "qx_id": element["qx_id"],
                     symptoms: symptomsDataLocal
 
@@ -254,27 +253,28 @@ export class SymptomsComponent implements OnInit {
               var isValidDate = true;
               var isComplete = true;
               this.questionaireSymptomData.forEach(obj => {
-                if (obj.status.toUpperCase() != "COMPLETED") {
+                if (((obj.status ) ?obj.status.toUpperCase():"") != "COMPLETED") {
                   isComplete = false;
                 }
                 if (obj.symptoms.some(symp => symp.score == 'No result'))
                   isValidDate = false;
               });
               var ErrorCode: string = '';
-              if (this.questionaireSymptomData.length == 0)
-                this.brokerService.emit(allMessages.showCustomError, 'M-002');
-              else {
-                if (!isValidDate)
-                  ErrorCode = ErrorCode.indexOf('D-002') != -1 ? ErrorCode : ErrorCode == '' ? 'D-002' : ErrorCode + ',' + 'D-002';
-                if (!isComplete)
-                  ErrorCode = ErrorCode.indexOf('U-004') != -1 ? ErrorCode : ErrorCode == '' ? 'U-004' : ErrorCode + ',' + 'U-004';
-                if (ErrorCode != '')
-                  this.brokerService.emit(allMessages.showCustomError, ErrorCode);
-              }
+              //if (this.questionaireSymptomData.length == 0) 
+              //this.brokerService.emit(allMessages.showCustomError, 'M-002');
+              //else {
+              if (!isValidDate)
+                ErrorCode = ErrorCode.indexOf('D-002') != -1 ? ErrorCode : ErrorCode == '' ? 'D-002' : ErrorCode + ',' + 'D-002';
+              if (!isComplete)
+                ErrorCode = ErrorCode.indexOf('U-004') != -1 ? ErrorCode : ErrorCode == '' ? 'U-004' : ErrorCode + ',' + 'U-004';
+              if (ErrorCode != '')
+                this.brokerService.emit(allMessages.showCustomError, ErrorCode);
+              // }
             }
             catch (ex) {
               console.log(ex);
               this.brokerService.emit(allMessages.showLogicalError, 'symptoms');
+              this.brokerService.emit(allMessages.checkboxEnable, 'symptoms');
             }
           })();
       })
@@ -334,7 +334,6 @@ export class SymptomsComponent implements OnInit {
           })();
       })
 
-
     this
       .subscriptions
       .add(sub1)
@@ -368,8 +367,8 @@ export class SymptomsComponent implements OnInit {
           this.drawtrendLineSymptoms(elems.qxid, elems.trendScore, elems.nameTrend, elems.trends)
       });
     }
-
   }
+
   drawtrendLineSymptoms(qid, scoreid, compName, trendData) {
     let maxValue = Math.max.apply(Math, trendData.map(function (o) { return o.index; }));
     let minValue = Math.min.apply(Math, trendData.map(function (o) { return o.index; }))
@@ -377,12 +376,9 @@ export class SymptomsComponent implements OnInit {
     let scale = d3.scaleLinear()
       .domain([minValue, maxValue])
       .range([25, 15]);
-    //Chart line
     let line = d3.line<any>()
       .x((d: any) => d.x)
       .y((d: any) => scale(d.index))
-
-    //Drawing container
 
     let svg = d3
       .select('#TrendLine_' + qid + '_' + scoreid + '_' + compName)
@@ -411,7 +407,7 @@ export class SymptomsComponent implements OnInit {
         return "#bfbfbf";
       })
       .style('cursor', 'pointer')
-      .append("svg:title") // TITLE APPENDED HERE
+      .append("svg:title")
       .text(function (d) { return d.score; })
 
 
@@ -477,38 +473,14 @@ export class SymptomsComponent implements OnInit {
       .on('click', d => {
         this.showSecondLevel(d);
       })
-    //   this.chart.selectAll('.dot-walk25feet')
-    //   .data(this.datasetB)
-    //   .enter()
-    //   .append('circle')
-    //   .attr('class', 'dot-walk25feet')
-    //   .attr('cx', d => (this.chartState.xScale(d.questionnaireDate_mod)) + 35)
-    //   .attr('cy', "-17")
-    //   .attr('r', 10)
-    //   .style('fill', "yellow")
-    //   .style('cursor', 'pointer')
-
-    // //Adds labels for clinician data
-    // this.chart.selectAll('.label-test')
-    //   .data(this.datasetB)
-    //   .enter()
-    //   .append('text')
-    //   .attr('class', 'label-test')
-    //   .style('font-size', '10px')
-    //   .attr("x", d =>
-    //     (this.chartState.xScale(d.questionnaireDate_mod)) + 32.5)
-    //   .attr("y", "-15")
-    //   .text("3");
 
   }
   setInnerSVGPolyfill() {
     var serializeXML = function (node, output) {
       var nodeType = node.nodeType;
-      if (nodeType == 3) { // TEXT nodes.
-        // Replace special XML characters with their entities.
+      if (nodeType == 3) {
         output.push(node.textContent.replace(/&/, '&amp;').replace(/</, '&lt;').replace('>', '&gt;'));
-      } else if (nodeType == 1) { // ELEMENT nodes.
-        // Serialize Element nodes.
+      } else if (nodeType == 1) {
         output.push('<', node.tagName);
         if (node.hasAttributes()) {
           var attrMap = node.attributes;
@@ -528,16 +500,11 @@ export class SymptomsComponent implements OnInit {
           output.push('/>');
         }
       } else if (nodeType == 8) {
-        // TODO(codedread): Replace special characters with XML entities?
         output.push('<!--', node.nodeValue, '-->');
       } else {
-        // TODO: Handle CDATA nodes.
-        // TODO: Handle ENTITY nodes.
-        // TODO: Handle DOCUMENT nodes.
         throw 'Error serializing XML. Unhandled node of type: ' + nodeType;
       }
     }
-    // The innerHTML DOM property for SVGElement.
     Object.defineProperty(SVGElement.prototype, 'innerHTML', {
       get: function () {
         var output = [];
@@ -549,21 +516,15 @@ export class SymptomsComponent implements OnInit {
         return output.join('');
       },
       set: function (markupText) {
-        // Wipe out the current contents of the element.
         while (this.firstChild) {
           this.removeChild(this.firstChild);
         }
 
         try {
-          // Parse the markup into valid nodes.
           var dXML = new DOMParser();
-
-          //dXML.async = false;
-          // Wrap the markup into a SVG node to ensure parsing works.
           var sXML = '<svg xmlns=\'http://www.w3.org/2000/svg\'>' + markupText + '</svg>';
           var svgDocElement = dXML.parseFromString(sXML, 'text/xml').documentElement;
 
-          // Now take each node, import it and append to this element.
           var childNode = svgDocElement.firstChild;
           while (childNode) {
             this.appendChild(this.ownerDocument.importNode(childNode, true));
@@ -575,7 +536,6 @@ export class SymptomsComponent implements OnInit {
       }
     });
 
-    // The innerSVG DOM property for SVGElement.
     Object.defineProperty(SVGElement.prototype, 'innerSVG', {
       get: function () {
         return this.innerHTML;

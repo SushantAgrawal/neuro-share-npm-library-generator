@@ -38,15 +38,14 @@ export class RelapsesComponent implements OnInit {
   private relapsesOpenAddPopUp: boolean = false;
   private isDateOutOfRange: boolean = false;
   private relapsisChartLoaded: boolean = false;
+  private isSymptomsChecked: boolean = false;
   registerDrag: any;
   constructor(private brokerService: BrokerService, public dialog: MdDialog, private neuroGraphService: NeuroGraphService) {
     this.paramData = this.neuroGraphService.get('queryParams')
     this.registerDrag = e => neuroGraphService.registerDrag(e);
   }
   ngOnInit() {
-    for (let i = 2017; i >= 1917; i--) {
-      this.years.push(i.toString());
-    }
+    this.years = Array.from(new Array(100), (val, index) => ((new Date()).getFullYear() - index).toString())
     this.subscriptions = this
       .brokerService
       .filterOn(allHttpMessages.httpGetRelapse)
@@ -58,7 +57,9 @@ export class RelapsesComponent implements OnInit {
           })()
           : (() => {
             try {
+              this.removeChart();
               this.relapsesData = d.data.relapses;
+
               if (d.data && d.data.relapses && d.data.relapses.length > 0) {
                 this.createChart();
               }
@@ -78,14 +79,15 @@ export class RelapsesComponent implements OnInit {
               this.brokerService.emit(allMessages.checkboxEnable, 'relapses');
 
               //custom error handling
-              if (!d.data || !d.data.relapses || d.data.relapses.length == 0)
-                this.brokerService.emit(allMessages.showCustomError, 'M-002');
-              else if (this.relapsesData.some(obj => obj.relapse_month == '' || obj.relapse_year == '' || obj.relapse_month == 'No result' || obj.relapse_year == 'No result'))
+              //if (!d.data || !d.data.relapses || d.data.relapses.length == 0)
+              //this.brokerService.emit(allMessages.showCustomError, 'M-002');
+              if (d.data && d.data.relapses && d.data.relapses.length > 0 && this.relapsesData.some(obj => obj.relapse_month == '' || obj.relapse_year == '' || obj.relapse_month == 'No result' || obj.relapse_year == 'No result'))
                 this.brokerService.emit(allMessages.showCustomError, 'D-002');
             }
             catch (ex) {
               console.log(ex);
               this.brokerService.emit(allMessages.showLogicalError, 'relapses');
+              this.brokerService.emit(allMessages.checkboxEnable, 'relapses');
             }
           })();
       })
@@ -105,20 +107,8 @@ export class RelapsesComponent implements OnInit {
         d.error
           ? console.log(d.error)
           : (() => {
-            try {
-              let matched = this.relapsesData.find((obj => obj.relapse_id == this.relapsesDetail.relapse_id));
-              matched.last_updated_instant = (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString() + "/15/" + this.relapsesDetail.year;
-              matched.clinician_confirmed = this.relapsesDetail.confirm;
-              matched.relapse_month = this.relapsesDetail.month;
-              matched.relapse_year = this.relapsesDetail.year;
-              this.dialogRef.close();
-              this.removeChart();
-              this.createChart();
-            }
-            catch (ex) {
-              console.log(ex);
-              this.brokerService.emit(allMessages.showLogicalError, 'relapses');
-            }
+            this.requestForData();
+            this.dialogRef.close();
           })();
       })
 
@@ -129,29 +119,20 @@ export class RelapsesComponent implements OnInit {
         d.error
           ? console.log(d.error)
           : (() => {
-            try {
-              let obj = {
-                relapse_id: d.data.relapse_id,
-                relapse_month: this.relapsesDetail.month,
-                relapse_year: this.relapsesDetail.year,
-                last_updated_provider_id: this.paramData.provider_id,
-                save_csn: this.paramData.csn,
-                save_csn_status: this.paramData.csn_status,
-                last_updated_instant: (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString() + "/15/" + this.relapsesDetail.year,
-                patient_reported: true,
-                qx_id: "",
-                clinician_confirmed: true,
-                relapseaxis: "2.0"
-              }
-              this.relapsesData.push(obj);
-              this.dialogRef.close();
-              this.removeChart();
-              this.createChart();
-            }
-            catch (ex) {
-              console.log(ex);
-              this.brokerService.emit(allMessages.showLogicalError, 'relapses');
-            }
+            this.requestForData();
+            this.dialogRef.close();
+          })();
+      })
+
+    let deleteRelapse = this
+      .brokerService
+      .filterOn(allHttpMessages.httpDeleteRelapse)
+      .subscribe(d => {
+        d.error
+          ? console.log(d.error)
+          : (() => {
+            this.requestForData();
+            this.dialogRef.close();
           })();
       })
 
@@ -163,22 +144,7 @@ export class RelapsesComponent implements OnInit {
             console.log(d.error)
           })
           : (() => {
-            this
-              .brokerService
-              .httpGet(allHttpMessages.httpGetRelapse, [
-                {
-                  name: 'pom_id',
-                  value: this.neuroGraphService.get('queryParams').pom_id
-                },
-                {
-                  name: 'startDate',
-                  value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.fromDate).format('MM/DD/YYYY')
-                },
-                {
-                  name: 'endDate',
-                  value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.toDate).format('MM/DD/YYYY')
-                }
-              ]);
+            this.requestForData();
           })();
       });
     let sub2 = relapses
@@ -222,12 +188,44 @@ export class RelapsesComponent implements OnInit {
     let sub4 = this.brokerService.filterOn(allMessages.graphScaleUpdated).subscribe(d => {
       d.error ? console.log(d.error) : (() => {
         if (this.relapsisChartLoaded) {
-          this.removeChart();
-          this.createChart();
+          if (d.data.fetchData) {
+            this.removeChart();
+            this.brokerService.emit(allMessages.neuroRelated, { artifact: 'relapses', checked: true });
+          }
+          else {
+            this.removeChart();
+            this.createChart();
+          }
         }
       })();
     })
+    //handle overlap with symptoms
 
+    let subSympChecked = this
+      .brokerService
+      .filterOn(allMessages.neuroRelated)
+      .filter(t => (t.data.artifact == 'symptoms')).filter(t => t.data.checked).subscribe(d => {
+        d.error ? console.log(d.error) : (() => {
+          this.isSymptomsChecked = true;
+          if (this.relapsisChartLoaded) {
+            this.removeChart();
+            this.createChart();
+          }
+        })();
+      });
+
+    let subSympUnchecked = this
+      .brokerService
+      .filterOn(allMessages.neuroRelated)
+      .filter(t => (t.data.artifact == 'symptoms')).filter(t => !t.data.checked).subscribe(d => {
+        d.error ? console.log(d.error) : (() => {
+          this.isSymptomsChecked = false;
+          if (this.relapsisChartLoaded) {
+            this.removeChart();
+            this.createChart();
+          }
+        })();
+      });
     this
       .subscriptions
       .add(sub1)
@@ -235,7 +233,27 @@ export class RelapsesComponent implements OnInit {
       .add(sub3)
       .add(sub4)
       .add(putRelapse)
-      .add(postRelapse);
+      .add(postRelapse)
+      .add(deleteRelapse)
+      .add(subSympChecked)
+      .add(subSympUnchecked);
+  }
+
+  requestForData() {
+    this.brokerService.httpGet(allHttpMessages.httpGetRelapse, [
+      {
+        name: 'pom_id',
+        value: this.neuroGraphService.get('queryParams').pom_id
+      },
+      {
+        name: 'startDate',
+        value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.fromDate).format('MM/DD/YYYY')
+      },
+      {
+        name: 'endDate',
+        value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.toDate).format('MM/DD/YYYY')
+      }
+    ]);
   }
 
   ngOnDestroy() {
@@ -244,64 +262,72 @@ export class RelapsesComponent implements OnInit {
       .unsubscribe();
   }
 
-  deleteChart() {
-    this.dialogRef.close();
-    let objIndex = this.relapsesData.findIndex((obj => obj.relapse_id == this.relapsesDetail.relapse_id));
-    if (objIndex > -1) {
-      this.relapsesData.splice(objIndex, 1);
-    }
-    this.removeChart();
-    this.createChart();
+  deleteRelapse() {
+    let matched = this.relapsesData.find((obj => obj.relapse_id == this.relapsesDetail.relapse_id));
+    let payload = {
+      pom_id: this.paramData.pom_id.toString(),
+      relapse_id: this.relapsesDetail.relapse_id,
+      provider_id: this.paramData.provider_id,
+      last_updated_provider_id: this.paramData.provider_id,
+      save_csn: this.paramData.csn,// matched.save_csn,
+      save_csn_status: this.paramData.csn_status,//matched.save_csn_status,
+      deleted_instant: this.neuroGraphService.moment(new Date()).format('MM/DD/YYYY HH:mm:ss')
+    };
+    this.brokerService.httpDelete(allHttpMessages.httpDeleteRelapse, payload);
   }
 
-  updateChart() {
+  updateRelapse() {
     if (this.relapsesDetail.year >= new Date().getFullYear() && new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() > new Date().getMonth()) {
       this.isDateOutOfRange = true;
     }
     else {
-      let matched = this.relapsesData.find((obj => obj.relapse_id == this.relapsesDetail.relapse_id));
-      let obj = {
-        pom_id: this.paramData.pom_id.toString(),
-        relapse_id: matched.relapse_id,
-        provider_id: matched.last_updated_provider_id,
+      let payload = {
+        pom_id: this.paramData.pom_id,
+        relapse_month: this.relapsesDetail.month,
+        relapse_year: this.relapsesDetail.year,
+        relapse_id: this.relapsesDetail.relapse_id,
+        provider_id: this.paramData.provider_id,
+        last_updated_provider_id: this.paramData.provider_id,
         save_csn: this.paramData.csn,
         save_csn_status: this.paramData.csn_status,
-        updated_instant: (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString() + "/15/" + this.relapsesDetail.year,
-        clinician_confirmed: matched.clinician_confirmed
+        updated_instant: this.neuroGraphService.moment(new Date()).format('MM/DD/YYYY HH:mm:ss'),
+        clinician_confirmed: this.relapsesDetail.confirm
       };
-      this.brokerService.httpPut(allHttpMessages.httpPutRelapse, { selectedRelapse: obj });
+      this.brokerService.httpPut(allHttpMessages.httpPutRelapse, payload);
     }
-
   }
 
   removeChart() {
     d3.select('#relapses').selectAll("*").remove();
   }
 
-  addChart() {
+  addRelapse() {
     if (this.relapsesDetail.year >= new Date().getFullYear() && new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() > new Date().getMonth()) {
       this.isDateOutOfRange = true;
     }
     else {
       if (this.relapsesDetail.year != "" && this.relapsesDetail.month != "") {
-        let updatedInstant = (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString() + "/15/" + this.relapsesDetail.year;
-        let objSave = {
+        let payload = {
           pom_id: this.paramData.pom_id,
-          relapse_month: this.month[new Date(updatedInstant).getMonth()],
+          relapse_month: this.relapsesDetail.month,
           relapse_year: this.relapsesDetail.year,
           provider_id: this.paramData.provider_id,
+          last_updated_provider_id: this.paramData.provider_id,
           save_csn: this.paramData.csn,
           save_csn_status: this.paramData.csn_status,
-          updated_instant: (new Date(this.relapsesDetail.month + "/15/" + this.relapsesDetail.year).getMonth() + 1).toString() + "/15/" + this.relapsesDetail.year
+          updated_instant: this.neuroGraphService.moment(new Date()).format('MM/DD/YYYY HH:mm:ss'),
+          patient_qx_reported: false,
+          clinician_confirmed: true
         }
-        this.brokerService.httpPost(allHttpMessages.httpPostRelapse, objSave);
+        this.brokerService.httpPost(allHttpMessages.httpPostRelapse, payload);
       }
     }
   }
 
   showSecondLevel(data) {
     this.relapsesDetail = { ...data };
-    if (data.save_csn_status == "Open") {
+
+    if (!data.save_csn_status || data.save_csn_status.toUpperCase() !== "CLOSED") {
       this.isEditSelected = false;
       this.isDateOutOfRange = false;
       let dialogConfig = { hasBackdrop: true, panelClass: 'ns-relapses-theme', width: '405px' };
@@ -317,7 +343,7 @@ export class RelapsesComponent implements OnInit {
   }
 
   checkChge() {
-    if (this.relapsesDetail.confirm == true) {
+    if (this.relapsesDetail.confirm) {
       this.relapsesDetail.confirm = false;
     }
     else {
@@ -343,7 +369,7 @@ export class RelapsesComponent implements OnInit {
         ...d,
         last_updated_instant: d.relapse_month + "/15/" + d.relapse_year,
         lastUpdatedDate: new Date(relYear, relMonth, 15),
-        confirm: d.clinician_confirmed,
+        confirm: d.clinician_confirmed && d.clinician_confirmed.toString().toUpperCase() === 'TRUE',
         month: d.relapse_month,
         year: d.relapse_year
       }
@@ -376,16 +402,20 @@ export class RelapsesComponent implements OnInit {
       .attr("transform", "translate(" + GRAPH_SETTINGS.panel.marginLeft + "," + GRAPH_SETTINGS.relapse.positionTop + ")")
       .attr("clip-path", "url(#relapses-clip)");
 
-    this.pathUpdate = this.chart.append("path")
-      .datum([
-        { "lastUpdatedDate": this.chartState.xDomain.currentMinValue },
-        { "lastUpdatedDate": this.chartState.xDomain.currentMaxValue }
-      ])
-      .attr("class", "line")
-      .attr("d", this.line)
-      .attr("stroke", "red")
-      .attr("stroke-width", "1.5")
-      .attr("fill", "none");
+    if (!this.isSymptomsChecked) {
+      this.pathUpdate = this.chart.append("path")
+        .datum([
+          { "lastUpdatedDate": this.chartState.xDomain.currentMinValue },
+          { "lastUpdatedDate": this.chartState.xDomain.currentMaxValue }
+        ])
+        .attr("class", "line")
+        .attr("d", this.line)
+        .attr("stroke", "red")
+        .attr("stroke-width", "1.5")
+        .attr("fill", "none");
+
+    }
+
 
     let arc = d3.symbol().type(d3.symbolTriangle).size(100);
     this.chart.selectAll(".triangle")

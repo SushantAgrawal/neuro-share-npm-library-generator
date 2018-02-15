@@ -27,8 +27,6 @@ export class LabsComponent implements OnInit {
   private dialogRef: any;
   private labsChartLoaded: boolean = false;
   registerDrag: any;
-  private labsDataStatic: any;
-
   constructor(private brokerService: BrokerService, public dialog: MdDialog, private neuroGraphService: NeuroGraphService) {
     this.registerDrag = e => neuroGraphService.registerDrag(e);
   }
@@ -46,22 +44,25 @@ export class LabsComponent implements OnInit {
           : (() => {
             try {
               if (d.data && d.data.EPIC && d.data.EPIC.labOrder) {
-                this.labsData = d.data.EPIC.labOrder.filter(item => labsConfig.some(f => f["Lab Component ID"] == item.procedureCode));
+                this.labsData = d.data.EPIC.labOrder
+                  .filter(item => labsConfig.some(f => f["proc_code"] == item.procedureCode))
+                  .filter(item => ((item.status) ? item.status.toUpperCase() : '') != "CANCELED");
               }
-              if (this.labsData && this.labsData.length > 0) {
+              if (d.data && d.data.EPIC && d.data.EPIC.labOrder && d.data.EPIC.labOrder.length > 0) {
                 this.createChart();
               }
               this.labsChartLoaded = true;
               this.brokerService.emit(allMessages.checkboxEnable, 'labs');
               //custom error handling
-              if (!this.labsData || this.labsData.length == 0)
-                this.brokerService.emit(allMessages.showCustomError, 'M-002');
-              else if (this.labsData.some(m => m.orderDate == '' || m.orderDate == 'No result'))
+              //if (!this.labsData || this.labsData.length == 0)
+              //this.brokerService.emit(allMessages.showCustomError, 'M-002');
+              if (this.labsData && this.labsData.length > 0 && this.labsData.some(m => m.orderDate == '' || m.orderDate == 'No result'))
                 this.brokerService.emit(allMessages.showCustomError, 'D-001');
             }
             catch (ex) {
               console.log(ex);
               this.brokerService.emit(allMessages.showLogicalError, 'labs');
+              this.brokerService.emit(allMessages.checkboxEnable, 'labs');
             }
           })();
       })
@@ -89,7 +90,7 @@ export class LabsComponent implements OnInit {
                 },
                 {
                   name: 'startDate',
-                  value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.fromDate).format('MM/DD/YYYY')
+                  value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.toDate).subtract(72, 'month').add(1, 'days').format('MM/DD/YYYY')
                 },
                 {
                   name: 'endDate',
@@ -114,8 +115,14 @@ export class LabsComponent implements OnInit {
     let sub3 = this.brokerService.filterOn(allMessages.graphScaleUpdated).subscribe(d => {
       d.error ? console.log(d.error) : (() => {
         if (this.labsChartLoaded) {
-          this.removeChart();
-          this.createChart();
+          if (d.data.fetchData) {
+            this.removeChart();
+            this.brokerService.emit(allMessages.neuroRelated, { artifact: 'labs', checked: true });
+          }
+          else {
+            this.removeChart();
+            this.createChart();
+          }
         }
       })();
     })
@@ -132,30 +139,31 @@ export class LabsComponent implements OnInit {
   }
   showSecondLevel(data) {
     this.labsDataDetails = data.orderDetails;
-    let compArray: Array<any> = [];
-    this.labsData.map(d => {
-      return {
-        ...d,
-        resultDate: new Date(d.dates.resultDate),
-      }
-    }).sort((a, b) => a.resultDate - b.resultDate).forEach(element => {
-      if (element.component.length > 0) {
-        if (element.component.length > 0 && element.dates.resultDate != "" && new Date(element.dates.resultDate) <= new Date(data.orderDetails[0].dates.resultDate)) {
-          element.component.forEach(elem => {
-            compArray.push(elem);
-          });
-        }
-      }
-    });
+
     this.labsDataDetails.forEach(element => {
+      let compArray: Array<any> = [];
+      this.labsData.map(d => {
+        return {
+          ...d,
+          resultDate: new Date(d.dates.resultDate),
+        }
+      }).sort((a, b) => b.resultDate - a.resultDate).sort((a, b) => b.id - a.id).forEach(innerelement => {
+        if (innerelement.component.length > 0) {
+          if (innerelement.component.length > 0 && innerelement.dates.resultDate != "" && new Date(innerelement.dates.resultDate) <= new Date(element.dates.resultDate) && innerelement.id <= element.id) {
+            innerelement.component.forEach(elem => {
+              compArray.push(elem);
+            });
+          }
+        }
+      });
       if (element.component.length > 0) {
         element.component.forEach(elem => {
           let selCompArray: Array<any> = [];
-          selCompArray = compArray.filter((obj => obj.id == elem.id));
+          selCompArray = compArray.filter((obj => obj.name == elem.name));
           let trendArray: Array<any> = [];
-          let i = 0;
+          let i = 120;
           selCompArray.forEach(elems => {
-            i = i + 30;
+            i = i - 30;
             let color = "#bfbfbf";
             if (elems.isValueInRange == true) {
               color = "#9dbb61";
@@ -163,9 +171,9 @@ export class LabsComponent implements OnInit {
             else {
               color = "#e53935";
             }
-            if (i <= 90) {
+            if (i > 0) {
               if (Number(elems.value) && elems.referenceLow != "")
-                trendArray.push({ "x": i, "y": Number(elems.value), "color": color })
+                trendArray.push({ "x": i, "y": Number(elems.value ? elems.value : 0), "color": color })
 
             }
           });
@@ -196,13 +204,15 @@ export class LabsComponent implements OnInit {
       });
   }
   plottrendline() {
-    if (this.labsDataDetails[0].component.length > 0) {
-      this.labsDataDetails[0].component.forEach(elems => {
-        if (elems.trendData.length > 0) {
-          this.drawtrendLine(this.labsDataDetails[0].procedureCode, elems.id, elems.trendData)
-        }
-      });
-    }
+    this.labsDataDetails.forEach(element => {
+      if (element.component.length > 0) {
+        element.component.forEach(elems => {
+          if (elems.trendData.length > 0) {
+            this.drawtrendLine(element.procedureCode, elems.id, elems.trendData)
+          }
+        });
+      }
+    });
 
   }
   drawtrendLine(labId, compId, trendData) {
@@ -265,8 +275,9 @@ export class LabsComponent implements OnInit {
     let outputCollection = [];
     let repeatCount = 0;
     let isComplete = "Empty";
-
-    for (let i = 0; i < tempDataset.length; i++) {
+    let i = 0;
+    while (i < tempDataset.length) {
+      let arrData: Array<number> = [];
       for (let j = 0; j < tempDataset.length; j++) {
         if (tempDataset[i].orderFormatDate == tempDataset[j].orderFormatDate) {
           if (repeatCount == 0) {
@@ -278,6 +289,7 @@ export class LabsComponent implements OnInit {
               'status': isComplete,
               'orderDetails': [tempDataset[j]]
             })
+            arrData.push(j);
             repeatCount++;
           }
           else {
@@ -290,10 +302,15 @@ export class LabsComponent implements OnInit {
               outputCollection[outputCollection.length - 1].status = isComplete;
             }
             outputCollection[outputCollection.length - 1].orderDetails.push(tempDataset[j]);
-            tempDataset.splice(j, 1);
+            arrData.push(j);
           }
         }
       }
+      arrData.reverse();
+      arrData.forEach(element => {
+        tempDataset.splice(element, 1);
+      });
+      arrData = [];
       repeatCount = 0;
       isComplete = "Empty";
     }
@@ -374,7 +391,7 @@ export class LabsComponent implements OnInit {
 
     this.chart.append("text")
       .attr("transform", "translate(" + this.chartState.xScale(this.chartState.xDomain.currentMinValue) + "," + "3.0" + ")")
-      .attr("dy", 0)
+      .attr("dy", 15)
       .attr("text-anchor", "start")
       .attr("font-size", "10px")
       .text("Labs");

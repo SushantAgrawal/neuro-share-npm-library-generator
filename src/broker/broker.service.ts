@@ -43,7 +43,14 @@ export class BrokerService {
     let headers = new Headers();
     headers.append('Content-Type', 'application/json');
     this.http.post(url, body, { headers: headers })
-      .map(response => response.json())
+      .map((response: any) => {
+        if (response && response._body) {
+          return response.json();
+        }
+        else {
+          return {};
+        }
+      })
       .subscribe(d => {
         this.subject.next({ id: id, data: d, body: body, carryBag: carryBag });
         (--this.counter == 0) && (this.isHide = true);
@@ -61,7 +68,14 @@ export class BrokerService {
     let headers = new Headers();
     headers.append('Content-Type', 'application/json');
     this.http.put(url, body, { headers: headers })
-      .map(response => response.json())
+      .map((response: any) => {
+        if (response && response._body) {
+          return response.json();
+        }
+        else {
+          return {};
+        }
+      })
       .subscribe(d => {
         this.subject.next({ id: id, data: d, body: body, carryBag: carryBag });
         (--this.counter == 0) && (this.isHide = true);
@@ -72,25 +86,49 @@ export class BrokerService {
       });
   };
 
+  httpDelete(id: string, body?: any, carryBag?: any) {
+    this.counter++;
+    this.isHide = false;
+    let url = this.urlMaps[id];
+    let headers = new Headers();
+    headers.append('Content-Type', 'application/json');
+    this.http.delete(url, { headers: headers, body: body })
+      .map((response: any) => {
+        if (response && response._body) {
+          return response.json();
+        }
+        else {
+          return {};
+        }
+      })
+      .subscribe(d => {
+        this.subject.next({ id: id, data: d, body: body, carryBag: carryBag });
+        (--this.counter == 0) && (this.isHide = true);
+      }, err => {
+        this.subject.next({ id: id, error: err, carryBag: carryBag });
+        this.subject.next({ id: this.errorMessageId, error: messages.httpDeleteUnknownError });
+        (--this.counter == 0) && (this.isHide = true);
+      });
+  };
+
   httpGet(id: string, queryParams?: { name: string, value: string }[], headers?: [any], carryBag?: any) {
     try {
       this.counter++;
       this.isHide = false;
       let url = this.urlMaps[id];
+
       let myParams = new URLSearchParams();
       queryParams && (queryParams.map(x => myParams.append(x.name, x.value)));
+      myParams.append('timestamp', (+new Date()).toString())
 
       let myHeaders = new Headers();
       headers && (headers.map(x => myHeaders.append(x.name, x.value)));
-      let options;
-      (headers || queryParams) && (options = new RequestOptions({
-        headers: headers
-          ? myHeaders
-          : null,
-        params: queryParams
-          ? myParams
-          : null
-      }));
+
+      let options = new RequestOptions({
+        headers: headers ? myHeaders : null,
+        params: myParams
+      })
+
       if (url) {
         this.http.get(url, options)
           .map(response => response.json())
@@ -120,19 +158,19 @@ export class BrokerService {
       this.counter++;
       let temp = queries.map(t => {
         let url = this.urlMaps[t.urlId];
+
         let myParams = new URLSearchParams();
         t.queryParams && (t.queryParams.forEach(x => myParams.append(x.name, x.value)));
+        myParams.append('timestamp', (+new Date()).toString())
+
         let myHeaders = new Headers();
         t.headers && (t.headers.forEach(x => myHeaders.append(x.name, x.value)));
-        let options;
-        (t.headers || t.queryParams) && (options = new RequestOptions({
-          headers: t.headers
-            ? myHeaders
-            : null,
-          params: t.queryParams
-            ? myParams
-            : null
-        }));
+
+        let options = new RequestOptions({
+          headers: t.headers ? myHeaders : null,
+          params: myParams
+        })
+
         return ({ url: url, options: options });
       });
       let emptyUrl = temp.find(x => !Boolean(x.url));

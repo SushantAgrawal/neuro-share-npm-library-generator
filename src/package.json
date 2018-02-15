@@ -1,6 +1,6 @@
 {
   "name": "@sutterhealth/neuro-graph",
-  "version": "0.1.21",
+  "version": "0.1.43",
   "repository": {
     "type": "git",
     "url": "https://github.com/username/repo"
@@ -19,10 +19,10 @@
   "bugs": {
     "url": "https://github.com/username/repo/issues"
   },
-  "main": "sutterhealth-neuro-graph.umd.js",
-  "module": "sutterhealth-neuro-graph.js",
-  "jsnext:main": "sutterhealth-neuro-graph.js",
-  "typings": "sutterhealth-neuro-graph.d.ts",
+  "main": "neuro-graph.umd.js",
+  "module": "neuro-graph.js",
+  "jsnext:main": "neuro-graph.js",
+  "typings": "neuro-graph.d.ts",
   "peerDependencies": {
     "@angular/core": "^4.0.0",
     "rxjs": "^5.1.0",

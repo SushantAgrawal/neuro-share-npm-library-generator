@@ -18,6 +18,7 @@ export class SharedGridComponent implements OnInit, OnDestroy {
   lastOfficeDateLabel: string;
   encounterData: any;
   progressNotes: Array<any>;
+  previousDateCSN: any;
   constructor(private brokerService: BrokerService, private neuroGraphService: NeuroGraphService, public dialog: MdDialog) {
   }
 
@@ -66,10 +67,8 @@ export class SharedGridComponent implements OnInit, OnDestroy {
     let sub2 = this.brokerService.filterOn(allHttpMessages.httpGetProgressNote)
       .subscribe(d => {
         d.error ? (() => { console.log(d.error) }) : (() => {
-          d.data && d.data.EPIC && (this.progressNotes = d.data.EPIC.notes);
-          let dialogConfig = { hasBackdrop: false, panelClass: 'ns-default-dialog', width: '375px', height: '350px' };
-          this.dialogRef = this.dialog.open(this.progressNoteTemplate, dialogConfig);
-          this.dialogRef.updatePosition({ top: '150px', left: '850px' });
+          d.data && d.data.EPIC && (this.progressNotes = d.data.EPIC.notes.filter((item => ((item.contactSerialNumber) ? item.contactSerialNumber.toString() : '') == this.previousDateCSN.toString())));
+          this.showNotes();
         })();
       })
     this.subscriptions.add(sub1).add(sub2);
@@ -81,6 +80,17 @@ export class SharedGridComponent implements OnInit, OnDestroy {
   //#endregion
 
   //#region Graph Drawing
+
+  showNotes() {
+    // this.progressNotes.forEach(element => {
+    //   if (element.text.length > 0 && element.text[0].indexOf('{\\rtf') > -1) {
+    //     element.text = '<i>Progress note currently unavailable. Please see EPIC.</i>';
+    //   }
+    // });
+    let dialogConfig = { hasBackdrop: false, panelClass: 'ns-default-dialog', width: '375px', height: '350px' };
+    this.dialogRef = this.dialog.open(this.progressNoteTemplate, dialogConfig);
+    this.dialogRef.updatePosition({ top: '150px', left: '850px' });
+  }
 
   getReferenceLineData() {
     this.brokerService.httpGet(allHttpMessages.httpGetEncounters, [
@@ -94,22 +104,38 @@ export class SharedGridComponent implements OnInit, OnDestroy {
       },
       {
         name: 'endDate',
-        value: this.neuroGraphService.moment(this.chartState.dataBufferPeriod.toDate).format('MM/DD/YYYY')
+        value: this.neuroGraphService.moment(this.chartState.xDomain.scaleMaxValue).format('MM/DD/YYYY')
       }
     ]);
   };
 
-  getProgessNoteData(prevCSN) {
-    this.brokerService.httpGet(allHttpMessages.httpGetProgressNote, [
-      {
-        name: 'pom-id',
-        value: this.neuroGraphService.get('queryParams').pom_id
-      },
-      {
-        name: 'csn',
-        value: prevCSN
-      }
-    ]);
+  getProgessNoteData(lastVisitDate) {
+    if (this.dialogRef) {
+      this.dialogRef.close()
+    }
+    if (!this.progressNotes || this.progressNotes.length == 0) {
+      this.brokerService.httpGet(allHttpMessages.httpGetProgressNote, [
+        {
+          name: 'pom-id',
+          value: this.neuroGraphService.get('queryParams').pom_id
+        },
+        {
+          name: 'note-category',
+          value: 'Progress Notes'
+        },
+        {
+          name: 'start-date',
+          value: this.neuroGraphService.moment(lastVisitDate).subtract(2, 'days').format('MM/DD/YYYY')
+        },
+        {
+          name: 'end-date',
+          value: this.neuroGraphService.moment(lastVisitDate).format('MM/DD/YYYY')
+        }
+      ]);
+    }
+    else {
+      this.showNotes();
+    }
   };
 
   drawRootElement(state): void {
@@ -198,9 +224,8 @@ export class SharedGridComponent implements OnInit, OnDestroy {
         axis.selectAll('line')
           .style('stroke-width', '1px')
           .style('stroke', (d) => {
-            return d.getMonth() == 6 ? '#bbb4b4' : '#E4E4E4';
+            return d.getMonth() == 0 ? '#bbb4b4' : '#E4E4E4';
           });
-
 
         axis.selectAll('line')
           .attr('y2', (d) => {
@@ -246,8 +271,8 @@ export class SharedGridComponent implements OnInit, OnDestroy {
     let previousDate: any;
     if (this.encounterData.length > 1) {
       previousDate = new Date(this.encounterData[1].date)
+      this.previousDateCSN = this.encounterData[1].contactSerialNumber;
     }
-
     let today = new Date();
     let width = 50;
     let height = 25;
@@ -258,6 +283,10 @@ export class SharedGridComponent implements OnInit, OnDestroy {
     let todayLastLabel = "Office Visit";
     let todayLabel = "";
     let currentDate = new Date(this.encounterData[0].date);
+    if (today > currentDate) {
+      previousDate = currentDate;
+    }
+
     if (today > currentDate) {
       todayLabel = "Today";
       this.lastOfficeDateLabel = this.neuroGraphService.moment(previousDate).format("MM/DD/YYYY");
@@ -270,19 +299,28 @@ export class SharedGridComponent implements OnInit, OnDestroy {
       lastOfficeheight = 40;
     }
 
+    nodeSelection.append('clipPath')
+      .attr('id', 'ref-line-clip')
+      .append('rect')
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("width", this.chartState.canvasDimension.width)
+      .attr("height", dimension.offsetHeight)
+
     nodeSelection.append("line")
+      .attr("clip-path", "url(#ref-line-clip)")
       .attr("x1", xScale(previousDate))
-      .attr("y1", 45)
+      .attr("y1", 15)
       .attr("x2", xScale(previousDate))
       .attr("y2", dimension.offsetHeight - dimension.marginTop - dimension.marginBottom)
       .style("stroke-dasharray", "2,2")
       .style("opacity", "0.4")
-      .style("stroke", "grey")
+      .style("stroke", "#000")
       .style("fill", "none");
 
     if (today > currentDate) {
       let rectPrev = nodeSelection.append("rect")
-        .attr("x", xScale(previousDate) - 40)
+        .attr("x", xScale(previousDate) - 85)
         .attr("y", "20")
         .attr("width", lastOfficewidth)
         .attr("height", lastOfficeheight)
@@ -290,24 +328,24 @@ export class SharedGridComponent implements OnInit, OnDestroy {
         .attr('stroke', '#BCBCBC')
         .style('cursor', 'pointer')
         .on('click', d => {
-          this.showProgressNote();
+          this.getProgessNoteData(previousDate);
         });
       let axisTextPrev = nodeSelection.append('text')
         .attr('y', 35)
         .style('font-size', '12px')
         .style('font-weight', 'bold')
       axisTextPrev.append('tspan')
-        .attr('x', xScale(previousDate) - 30)
+        .attr('x', xScale(previousDate) - 75)
         .attr('dy', 0)
         .text(this.lastOfficeDateLabel)
         .style('cursor', 'pointer')
         .on('click', d => {
-          this.showProgressNote();
+          this.getProgessNoteData(previousDate);
         });
     }
     else {
       let rectPrev = nodeSelection.append("rect")
-        .attr("x", xScale(previousDate) - 40)
+        .attr("x", xScale(previousDate) - 85)
         .attr("y", "20")
         .attr("width", lastOfficewidth)
         .attr("height", lastOfficeheight)
@@ -315,7 +353,7 @@ export class SharedGridComponent implements OnInit, OnDestroy {
         .attr('stroke', '#BCBCBC')
         .style('cursor', 'pointer')
         .on('click', d => {
-          this.showProgressNote();
+          this.getProgessNoteData(previousDate);
         });
       let axisTextPrev = nodeSelection.append('text')
         .attr('y', 35)
@@ -323,75 +361,71 @@ export class SharedGridComponent implements OnInit, OnDestroy {
         .style('font-weight', 'bold')
         .style('cursor', 'pointer')
       axisTextPrev.append('tspan')
-        .attr('x', xScale(previousDate) - 10)
+        .attr('x', xScale(previousDate) - 60)
         .attr('dy', 0)
         .text(lastOfficeLabel1)
       axisTextPrev.append('tspan')
-        .attr('x', xScale(previousDate) - 30)
+        .attr('x', xScale(previousDate) - 75)
         .attr('dy', 15)
         .text(todayLastLabel)
         .on('click', d => {
-          this.showProgressNote();
+          this.getProgessNoteData(previousDate);
         })
     }
 
     nodeSelection.append("line")
-      .attr("x1", xScale(currentDate))
-      .attr("y1", 45)
-      .attr("x2", xScale(currentDate))
+      .attr("clip-path", "url(#ref-line-clip)")
+      .attr("x1", xScale(today))
+      .attr("y1", 15)
+      .attr("x2", xScale(today))
       .attr("y2", dimension.offsetHeight - dimension.marginTop - dimension.marginBottom)
       .style("stroke-dasharray", "2,2")
       .style("opacity", "0.4")
-      .style("stroke", "grey")
+      .style("stroke", "#000")
       .style("fill", "none");
 
     if (today > currentDate) {
       let rect = nodeSelection.append("rect")
-        .attr("x", xScale(currentDate) - 25)
-        .attr("y", "20")
+        .attr("x", xScale(today) - 50)
+        .attr("y", "50")
         .attr("width", width)
         .attr("height", height)
         .attr("fill", "#EBEBEB")
         .attr('stroke', '#BCBCBC');
       let axisText = nodeSelection.append('text')
-        .attr('y', 35)
+        .attr('y', 67)
         .style('font-size', '12px')
         .style('font-weight', 'bold')
       axisText.append('tspan')
-        .attr('x', xScale(currentDate) - 15)
+        .attr('x', xScale(today) - 42)
         .attr('dy', 0)
         .text(todayLabel)
     }
     else {
       let rect = nodeSelection.append("rect")
-        .attr("x", xScale(currentDate) - 40)
-        .attr("y", "20")
+        .attr("x", xScale(currentDate) - 85)
+        .attr("y", "65")
         .attr("width", width)
         .attr("height", height)
         .attr("fill", "#EBEBEB")
         .attr('stroke', '#BCBCBC');
       let axisText = nodeSelection.append('text')
-        .attr('y', 35)
+        .attr('y', 79)
         .style('font-size', '12px')
         .style('font-weight', 'bold')
       axisText.append('tspan')
-        .attr('x', xScale(currentDate) - 20)
+        .attr('x', xScale(currentDate) - 68)
         .attr('dy', 0)
         .text(todayLabel1)
       axisText.append('tspan')
-        .attr('x', xScale(currentDate) - 30)
-        .attr('dy', 15)
+        .attr('x', xScale(currentDate) - 72)
+        .attr('dy', 17)
         .text(todayLastLabel)
     }
   };
 
-  showProgressNote() {
-    let prevCSN = "0";
-    if (this.encounterData.length > 1) {
-      prevCSN = this.encounterData[1].contactSerialNumber;
-    }
-    this.getProgessNoteData(prevCSN);
-  };
 
   //#endregion
 }
+
+

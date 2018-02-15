@@ -22,8 +22,8 @@
     "annotateForClosureCompiler": true,
     "strictMetadataEmit": true,
     "skipTemplateCodegen": true,
-    "flatModuleOutFile": "sutterhealth-neuro-graph.js",
-    "flatModuleId": "sutterhealth-neuro-graph"
+    "flatModuleOutFile": "neuro-graph.js",
+    "flatModuleId": "@sutterhealth/neuro-graph"
   },
   "files": [
     "./index.ts"

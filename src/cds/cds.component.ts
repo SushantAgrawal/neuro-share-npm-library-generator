@@ -3,7 +3,7 @@ import { BrokerService } from '../broker/broker.service';
 import { NeuroGraphService } from '../neuro-graph.service';
 import { Observable } from 'rxjs/Observable';
 import { MdDialog } from '@angular/material';
-import { cdsMap, allMessages, manyHttpMessages, allHttpMessages } from '../neuro-graph.config';
+import { cdsMap, allMessages, allHttpMessages } from '../neuro-graph.config';
 import { InfoPopupComponent } from './info-popup/info-popup.component';
 import { ProgressNotesGeneratorService } from '@sutterhealth/progress-notes';
 
@@ -15,7 +15,14 @@ export class CdsComponent implements OnInit {
   cdsUserData: any;
   cdsState: any = {};
   csnState: any = {};
+  cdsDataArrives: boolean = false;
+  cdsForCsnExists: boolean = false;
+  isEnable: boolean = false;
   constructor(private brokerService: BrokerService, private changeDetector: ChangeDetectorRef, private neuroGraphService: NeuroGraphService, public dialog: MdDialog, private progressNotesGeneratorService: ProgressNotesGeneratorService) {
+
+    this.csnState.csn = this.neuroGraphService.get('queryParams').csn;
+    this.csnState.encounterStatus = this.neuroGraphService.get('queryParams').csn_status;
+
     this.cdsState = {
       review_relapses: {
         checked: false
@@ -59,10 +66,12 @@ export class CdsComponent implements OnInit {
         let cdsTarget: [any] = cdsMap[cdsSource];
         let checked = d.data.checked;
         checked && (cdsTarget && cdsTarget.forEach(x => this.cdsState[x].checked = true));
-        this
-          .changeDetector
-          .detectChanges();
+        this.changeDetector.detectChanges();
+        if (this.cdsDataArrives) {
+          this.saveChkBoxesState();
+        }
       });
+
     let sub1 = this
       .brokerService
       .filterOn(allHttpMessages.httpGetCdsInfo)
@@ -71,28 +80,32 @@ export class CdsComponent implements OnInit {
           ? console.log(d.error)
           : this.cdsInfo = d.data.cds || [];
       });
+
     let sub2 = this
       .brokerService
       .filterOn(allHttpMessages.httpGetCdsUserData)
       .subscribe(d => {
+        this.isEnable = !this.csnState.encounterStatus || this.csnState.encounterStatus.toUpperCase() !== "CLOSED";
         d.error
           ? console.log(d.error)
           : (() => {
             try {
+              this.cdsDataArrives = true;
               this.cdsUserData = d.data.cds || [];
-              this.csnState.csn = this
-                .neuroGraphService
-                .get('queryParams')
-                .csn;
-              this.csnState.encounterStatus = this
-                .neuroGraphService
-                .get('queryParams')
-                .csn_status;
-              this.cdsUserData = this
-                .cdsUserData
-                .find(x => x.save_csn == this.csnState.csn);
-              if (this.cdsUserData) {
+              this.cdsUserData = this.cdsUserData
+                .filter(x => x.save_csn == this.csnState.csn)
+                .map(d => {
+                  return {
+                    ...d,
+                    lastUpdateDate: new Date(d.last_updated_instant)
+                  }
+                })
+                .sort((a, b) => b.lastUpdateDate - a.lastUpdateDate);
+
+              if (this.cdsUserData.length > 0) {
+                this.cdsUserData = this.cdsUserData[0];
                 this.setChkBoxes();
+                this.cdsForCsnExists = true;
               }
             } catch (ex) {
               console.log(ex);
@@ -100,43 +113,39 @@ export class CdsComponent implements OnInit {
             }
           })();
       });
+
     let sub3 = this
       .brokerService
       .filterOn(allHttpMessages.httpPutCdsUserData)
-      .subscribe(d => d.error
-        ? console.log(d.error)
-        : console.log(d.data));
+      .subscribe(d => d.error ? console.log(d.error) : (() => {
+        //
+      })());
+
     let sub4 = this
       .brokerService
       .filterOn(allHttpMessages.httpPostCdsUserData)
       .subscribe(d => {
         d.error ? console.log(d.error) : (() => {
-          //ToDo:
-          console.log(d.data);
+          this.cdsForCsnExists = true;
         })();
       });
+
     let sub5 = this
       .brokerService
       .filterOn(allMessages.demographicEnableCheckBox)
       .subscribe(d => d.error
         ? console.log(d.error)
         : this.cdsState.review_ms_type_status.checked = true);
-    this
-      .brokerService
-      .httpGet(allHttpMessages.httpGetCdsInfo);
-    this
-      .brokerService
-      .httpGet(allHttpMessages.httpGetCdsUserData, [
-        {
-          name: 'pom_id',
-          value: this
-            .neuroGraphService
-            .get('queryParams')
-            .pom_id
-        }
-      ]);
-    this
-      .subscriptions
+
+    this.brokerService.httpGet(allHttpMessages.httpGetCdsInfo);
+    this.brokerService.httpGet(allHttpMessages.httpGetCdsUserData, [
+      {
+        name: 'pom_id',
+        value: this.neuroGraphService.get('queryParams').pom_id
+      }
+    ]);
+
+    this.subscriptions
       .add(sub1)
       .add(sub2)
       .add(sub3)
@@ -145,9 +154,12 @@ export class CdsComponent implements OnInit {
   }
 
   saveChkBoxesState() {
-    this
-      .brokerService
-      .httpPost(allHttpMessages.httpPostCdsUserData, this.getCdsStateData());
+    if (this.cdsForCsnExists) {
+      this.brokerService.httpPut(allHttpMessages.httpPutCdsUserData, this.getCdsStateData());
+    }
+    else {
+      this.brokerService.httpPost(allHttpMessages.httpPostCdsUserData, this.getCdsStateData());
+    }
   }
   getCdsStateData() {
     let cdsStateData: any = {};
@@ -162,29 +174,26 @@ export class CdsComponent implements OnInit {
           cdsStateData[x] = "No";
         }
       });
-    cdsStateData.provider_id = this.cdsUserData.last_updated_provider_id;
-    cdsStateData.encounter_csn = this.cdsUserData.save_csn;
-    cdsStateData.updated_instant = this
-      .neuroGraphService
-      .moment()
-      .format('MM/DD/YYYY HH:mm:ss');
+
+    cdsStateData.pom_id = this.neuroGraphService.get('queryParams').pom_id;
+    cdsStateData.provider_id = this.neuroGraphService.get('queryParams').provider_id;
+    cdsStateData.save_csn = this.neuroGraphService.get('queryParams').csn;
+    cdsStateData.save_csn_status = this.neuroGraphService.get('queryParams').csn_status;
+
     return (cdsStateData);
   }
+
   setChkBoxes() {
-    Object
-      .keys(this.cdsUserData)
-      .map(x => {
-        this.cdsState[x] && (this.cdsState[x].checked = ((this.cdsUserData[x] == 'Yes') || (this.cdsState[x].checked))
-          ? true
-          : false);
-      });
-    this
-      .changeDetector
-      .detectChanges();
+    Object.keys(this.cdsUserData).map(x => {
+      this.cdsState[x] && (this.cdsState[x].checked = ((this.cdsUserData[x] == 'Yes') || (this.cdsUserData[x] == 'yes') || (this.cdsState[x].checked)) ? true : false);
+    });
+    this.changeDetector.detectChanges();
   }
+
   changed(event, item) {
     this.saveChkBoxesState();
   }
+
   openDialog(e, infoTitle) {
     let x = e.clientX;
     let y = e.clientY;
