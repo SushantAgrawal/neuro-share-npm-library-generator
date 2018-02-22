@@ -115,22 +115,27 @@ export class SharedGridComponent implements OnInit, OnDestroy {
     }
     if (!this.progressNotes || this.progressNotes.length == 0) {
       this.brokerService.httpGet(allHttpMessages.httpGetProgressNote, [
+        // {
+        //   name: 'pom-id',
+        //   value: this.neuroGraphService.get('queryParams').pom_id
+        // },
         {
-          name: 'pom-id',
-          value: this.neuroGraphService.get('queryParams').pom_id
+          name: 'patient_info',
+          value: 'contactSerialNumber:' +  this.previousDateCSN
         },
         {
-          name: 'note-category',
+          name: 'note_category',
           value: 'Progress Notes'
-        },
-        {
-          name: 'start-date',
-          value: this.neuroGraphService.moment(lastVisitDate).subtract(2, 'days').format('MM/DD/YYYY')
-        },
-        {
-          name: 'end-date',
-          value: this.neuroGraphService.moment(lastVisitDate).format('MM/DD/YYYY')
         }
+        //,
+        // {
+        //   name: 'start-date',
+        //   value: this.neuroGraphService.moment(lastVisitDate).subtract(2, 'days').format('MM/DD/YYYY')
+        // },
+        // {
+        //   name: 'end-date',
+        //   value: this.neuroGraphService.moment(lastVisitDate).format('MM/DD/YYYY')
+        // }
       ]);
     }
     else {

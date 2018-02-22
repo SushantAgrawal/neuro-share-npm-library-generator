@@ -135,7 +135,12 @@ export class CdsComponent implements OnInit {
       .filterOn(allMessages.demographicEnableCheckBox)
       .subscribe(d => d.error
         ? console.log(d.error)
-        : this.cdsState.review_ms_type_status.checked = true);
+        : (() => {
+          this.cdsState.review_ms_type_status.checked = true;
+          if (this.cdsDataArrives) {
+            this.saveChkBoxesState();
+          }
+        })());
 
     this.brokerService.httpGet(allHttpMessages.httpGetCdsInfo);
     this.brokerService.httpGet(allHttpMessages.httpGetCdsUserData, [
